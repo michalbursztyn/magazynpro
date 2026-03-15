@@ -387,6 +387,284 @@ function initNewPartToggle() {
 
 // === MAIN INIT ===
 
+const APP_TAB_ACCESS = {
+  parts: ["owner", "worker"],
+  delivery: ["owner", "worker"],
+  build: ["owner", "worker"],
+  machines: ["owner", "worker"],
+  catalog_parts: ["owner"],
+  catalog_suppliers: ["owner"],
+  catalog_machines: ["owner"],
+  history: ["owner"],
+  users: ["owner"]
+};
+
+let currentActiveTab = "parts";
+window.companyUsersState = window.companyUsersState || {
+  items: [],
+  loading: false,
+  error: ""
+};
+
+function getCurrentCompanyRole() {
+  return String(window.appAuth?.companyRole || "").trim().toLowerCase();
+}
+
+function getAllowedTabsForRole(role) {
+  const normalized = String(role || "").trim().toLowerCase();
+  return Object.entries(APP_TAB_ACCESS)
+    .filter(([, roles]) => roles.includes(normalized))
+    .map(([tab]) => tab);
+}
+
+function canAccessTab(tab, roleOverride) {
+  const role = roleOverride || getCurrentCompanyRole();
+  const allowed = APP_TAB_ACCESS[String(tab || "").trim()] || [];
+  return allowed.includes(role);
+}
+
+function getDefaultTabForRole(roleOverride) {
+  const role = roleOverride || getCurrentCompanyRole();
+  const allowed = getAllowedTabsForRole(role);
+  return allowed.includes("parts") ? "parts" : (allowed[0] || "parts");
+}
+
+function setActiveTab(target, opts = {}) {
+  const role = getCurrentCompanyRole();
+  const requested = String(target || "").trim();
+  const fallback = getDefaultTabForRole(role);
+  const nextTab = canAccessTab(requested, role) ? requested : fallback;
+
+  document.querySelectorAll('.tab-btn[data-tab-target]').forEach(btn => {
+    const isActive = btn.getAttribute('data-tab-target') === nextTab;
+    btn.classList.toggle('active', isActive);
+    btn.setAttribute('aria-current', isActive ? 'page' : 'false');
+  });
+
+  document.querySelectorAll('.tabPanel[data-tab-panel]').forEach(panel => {
+    panel.classList.toggle('hidden', panel.getAttribute('data-tab-panel') !== nextTab);
+  });
+
+  currentActiveTab = nextTab;
+
+  const tabRefreshers = {
+    parts: () => renderWarehouse(),
+    delivery: () => { renderAllSuppliers(); refreshCatalogsUI(); renderDelivery(); },
+    build: () => { refreshCatalogsUI(); renderBuild(); },
+    machines: () => renderMachinesStock(),
+    catalog_parts: () => refreshCatalogsUI(),
+    catalog_suppliers: () => renderAllSuppliers(),
+    catalog_machines: () => refreshCatalogsUI(),
+    history: () => renderHistory(),
+    users: () => { if (typeof renderUsersAdmin === 'function') renderUsersAdmin(); }
+  };
+
+  const refresh = tabRefreshers[nextTab];
+  if (!opts.skipRefresh && typeof refresh === 'function') refresh();
+
+  return nextTab;
+}
+
+function applyRoleAccess() {
+  const role = getCurrentCompanyRole();
+  const allowedTabs = new Set(getAllowedTabsForRole(role));
+
+  document.querySelectorAll('.tab-btn[data-tab-target]').forEach(btn => {
+    const target = btn.getAttribute('data-tab-target');
+    const allowed = allowedTabs.has(target);
+    btn.hidden = !allowed;
+    btn.disabled = !allowed;
+    btn.setAttribute('aria-hidden', allowed ? 'false' : 'true');
+    btn.setAttribute('tabindex', allowed ? '0' : '-1');
+  });
+
+  document.querySelectorAll('.tabPanel[data-tab-panel]').forEach(panel => {
+    const target = panel.getAttribute('data-tab-panel');
+    if (!allowedTabs.has(target)) panel.classList.add('hidden');
+  });
+
+  if (!allowedTabs.has(currentActiveTab)) {
+    setActiveTab(getDefaultTabForRole(role));
+  }
+}
+
+function hasAppAccess() {
+  if (!window.appAuth?.session) return false;
+  if (window.appAuth?.profile?.is_active === false) return false;
+  if (!window.appAuth?.companyId) return false;
+  if (!window.appAuth?.companyRole) return false;
+  return true;
+}
+
+async function loadCompanyUsers() {
+  if (!window.companyUsersState) return [];
+  window.companyUsersState.loading = true;
+  window.companyUsersState.error = "";
+  try {
+    const items = await window.fetchCompanyUsers?.();
+    window.companyUsersState.items = Array.isArray(items) ? items : [];
+    return window.companyUsersState.items;
+  } catch (err) {
+    console.error('Błąd listy użytkowników:', err);
+    window.companyUsersState.error = err?.message || 'Nie udało się pobrać listy użytkowników.';
+    throw err;
+  } finally {
+    window.companyUsersState.loading = false;
+  }
+}
+
+function renderUsersAdmin() {
+  const panel = document.querySelector('[data-tab-panel="users"]');
+  const tbody = document.querySelector('#companyUsersTable tbody');
+  if (!panel || !tbody) return;
+
+  if (!canAccessTab('users')) {
+    panel.classList.add('hidden');
+    return;
+  }
+
+  const st = window.companyUsersState || { items: [], loading: false, error: '' };
+  if (st.loading) {
+    tbody.innerHTML = `<tr><td colspan="4" class="text-muted" style="text-align:center;padding:var(--space-4)">Ładowanie użytkowników...</td></tr>`;
+    return;
+  }
+
+  if (st.error) {
+    tbody.innerHTML = `<tr><td colspan="4" class="text-muted" style="text-align:center;padding:var(--space-4)">${escapeHtml(st.error)}</td></tr>`;
+    return;
+  }
+
+  const items = Array.isArray(st.items) ? st.items : [];
+  if (!items.length) {
+    tbody.innerHTML = `<tr><td colspan="4" class="text-muted" style="text-align:center;padding:var(--space-4)">Brak użytkowników w firmie.</td></tr>`;
+    return;
+  }
+
+  const currentUserId = window.appAuth?.user?.id || null;
+
+  tbody.innerHTML = items.map(item => {
+    const isOwnerRow = String(item.role || '').toLowerCase() === 'owner';
+    const isSelf = currentUserId && item.user_id === currentUserId;
+    const canModify = !isOwnerRow && !isSelf;
+    const statusCls = item.is_active ? 'success' : 'warning';
+    const statusLabel = item.is_active ? 'Aktywny' : 'Nieaktywny';
+    const actionLabel = item.is_active ? 'Dezaktywuj' : 'Aktywuj';
+    const nextActive = item.is_active ? '0' : '1';
+
+    return `
+      <tr>
+        <td>
+          <div class="user-email-cell">
+            <strong>${escapeHtml(item.email || '—')}</strong>
+            <span>${escapeHtml(item.full_name || (isSelf ? 'To konto' : ''))}</span>
+          </div>
+        </td>
+        <td>
+          ${isOwnerRow
+            ? `<span class="badge badge-accent">owner</span>`
+            : `<span class="user-role-inline"><select class="user-role-select" data-action="userRoleChange" data-member-id="${escapeHtml(String(item.id))}" ${canModify ? '' : 'disabled'}><option value="worker" ${String(item.role) === 'worker' ? 'selected' : ''}>worker</option></select><button type="button" class="btn btn-secondary btn-sm" data-action="saveUserRole" data-member-id="${escapeHtml(String(item.id))}">Zapisz</button></span>`}
+        </td>
+        <td><span class="status-pill status-pill-${statusCls} user-status-pill">${statusLabel}</span></td>
+        <td class="text-right">
+          <div class="user-row-actions">
+            <button type="button" class="btn btn-secondary btn-sm" data-action="toggleUserActive" data-member-id="${escapeHtml(String(item.id))}" data-next-active="${nextActive}" ${canModify ? '' : 'disabled'}>${actionLabel}</button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function bindUserManagementUI() {
+  if (window.__userManagementBound) return;
+  window.__userManagementBound = true;
+
+  document.getElementById('refreshUsersBtn')?.addEventListener('click', async () => {
+    if (!canAccessTab('users')) return;
+    try {
+      renderUsersAdmin();
+      await loadCompanyUsers();
+      renderUsersAdmin();
+      toast('Odświeżono', 'Lista użytkowników została odświeżona.', 'success');
+    } catch (err) {
+      renderUsersAdmin();
+      toast('Błąd użytkowników', err?.message || 'Nie udało się odświeżyć listy użytkowników.', 'error');
+    }
+  });
+
+  document.getElementById('inviteWorkerBtn')?.addEventListener('click', async () => {
+    if (!canAccessTab('users')) return;
+
+    const emailInput = document.getElementById('inviteWorkerEmailInput');
+    const roleSelect = document.getElementById('inviteWorkerRoleSelect');
+    const email = String(emailInput?.value || '').trim().toLowerCase();
+    const role = String(roleSelect?.value || 'worker').trim().toLowerCase() || 'worker';
+
+    if (!email) {
+      toast('Brak e-maila', 'Podaj adres e-mail pracownika.', 'warning');
+      emailInput?.focus?.();
+      return;
+    }
+
+    const btn = document.getElementById('inviteWorkerBtn');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Dodawanie...';
+    }
+
+    try {
+      const result = await window.inviteCompanyWorker?.(email, role);
+      emailInput && (emailInput.value = '');
+      await loadCompanyUsers();
+      renderUsersAdmin();
+      toast('Pracownik dodany', result?.message || `Uruchomiono bezpieczny flow dla ${email}.`, 'success');
+    } catch (err) {
+      console.error('Błąd dodawania pracownika:', err);
+      toast('Nie dodano pracownika', err?.message || 'Nie udało się uruchomić flow zaproszenia.', 'error');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Dodaj pracownika';
+      }
+    }
+  });
+
+  document.addEventListener('click', async (e) => {
+    const saveRoleBtn = e.target?.closest?.('[data-action="saveUserRole"]');
+    if (saveRoleBtn) {
+      if (!canAccessTab('users')) return;
+      const memberId = saveRoleBtn.getAttribute('data-member-id');
+      const select = document.querySelector(`[data-action="userRoleChange"][data-member-id="${CSS.escape(memberId)}"]`);
+      const nextRole = String(select?.value || 'worker').trim().toLowerCase();
+      try {
+        await window.updateCompanyMember?.(memberId, { role: nextRole });
+        await loadCompanyUsers();
+        renderUsersAdmin();
+        toast('Rola zapisana', 'Zmiana roli została zapisana.', 'success');
+      } catch (err) {
+        console.error('Błąd zmiany roli:', err);
+        toast('Nie zapisano roli', err?.message || 'Nie udało się zmienić roli.', 'error');
+      }
+      return;
+    }
+
+    const toggleActiveBtn = e.target?.closest?.('[data-action="toggleUserActive"]');
+    if (toggleActiveBtn) {
+      if (!canAccessTab('users')) return;
+      const memberId = toggleActiveBtn.getAttribute('data-member-id');
+      const nextActive = toggleActiveBtn.getAttribute('data-next-active') === '1';
+      try {
+        await window.updateCompanyMember?.(memberId, { is_active: nextActive });
+        await loadCompanyUsers();
+        renderUsersAdmin();
+        toast(nextActive ? 'Użytkownik aktywowany' : 'Użytkownik dezaktywowany', 'Status użytkownika został zaktualizowany.', 'success');
+      } catch (err) {
+        console.error('Błąd zmiany statusu użytkownika:', err);
+        toast('Nie zapisano statusu', err?.message || 'Nie udało się zmienić statusu użytkownika.', 'error');
+      }
+    }
+  });
+}
 
 // === Auth gate ===
 function getAuthElements() {
@@ -457,6 +735,7 @@ function updateAuthUI() {
   }
   if (roleBadge) roleBadge.textContent = String(role).toUpperCase();
   setAuthError("");
+  if (loggedIn) applyRoleAccess();
 }
 
 async function ensureAuthSession() {
@@ -476,7 +755,18 @@ async function ensureAuthSession() {
   }
 
   updateAuthUI();
-  return !!window.appAuth?.session;
+
+  if (!window.appAuth?.session) {
+    return false;
+  }
+
+  if (!hasAppAccess()) {
+    setAuthLocked(true);
+    setAuthError("To konto nie ma aktywnego dostępu do firmy albo zostało dezaktywowane.");
+    return false;
+  }
+
+  return true;
 }
 
 function bindAuthUI() {
@@ -593,6 +883,7 @@ async function init() {
   bindPartEditorModal();
   bindSupplierEditorModal();
   bindSearch();
+  bindUserManagementUI();
   initHistoryViewToggle();
   initHistoryFilters();
   initSidePanelSignals();
@@ -603,6 +894,14 @@ async function init() {
   renderMachinesStock();
   refreshCatalogsUI();
   bindSupplierPricesUI();
+  applyRoleAccess();
+
+  if (canAccessTab('users')) {
+    try {
+      await loadCompanyUsers();
+    } catch {}
+    renderUsersAdmin();
+  }
 
   // Sync threshold UI
   const warnRange = document.getElementById("warnRange");
@@ -695,6 +994,7 @@ async function init() {
   }
 
   save();
+  setActiveTab(getDefaultTabForRole());
   window.__appInitialized = true;
 }
 
@@ -1551,36 +1851,27 @@ function bindSearch() {
 
 // === Tabs ===
 function bindTabs() {
-  const tabRefreshers = {
-    parts: () => renderWarehouse(),
-    delivery: () => { renderAllSuppliers(); refreshCatalogsUI(); renderDelivery(); },
-    build: () => { refreshCatalogsUI(); renderBuild(); },
-    machines: () => renderMachinesStock(),
-    catalog_parts: () => refreshCatalogsUI(),
-    catalog_suppliers: () => renderAllSuppliers(),
-    catalog_machines: () => refreshCatalogsUI(),
-    history: () => renderHistory()
-  };
+  if (window.__tabsBound) {
+    applyRoleAccess();
+    setActiveTab(currentActiveTab || getDefaultTabForRole());
+    return;
+  }
+  window.__tabsBound = true;
 
   document.querySelectorAll('.tab-btn[data-tab-target]').forEach(btn => {
     btn.addEventListener('click', () => {
       const target = btn.getAttribute('data-tab-target');
-      
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      
-      document.querySelectorAll('.tabPanel').forEach(panel => {
-        if (panel.getAttribute('data-tab-panel') === target) {
-          panel.classList.remove('hidden');
-        } else {
-          panel.classList.add('hidden');
-        }
-      });
-
-      const refresh = tabRefreshers[target];
-      if (typeof refresh === 'function') refresh();
+      if (!canAccessTab(target)) {
+        toast('Brak dostępu', 'Ta sekcja nie jest dostępna dla Twojej roli.', 'warning');
+        setActiveTab(getDefaultTabForRole());
+        return;
+      }
+      setActiveTab(target);
     });
   });
+
+  applyRoleAccess();
+  setActiveTab(currentActiveTab || getDefaultTabForRole());
 }
 
 // === Edit Part Functions ===

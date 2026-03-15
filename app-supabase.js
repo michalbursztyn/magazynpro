@@ -2,7 +2,8 @@
 
 window.APP_SUPABASE_CONFIG = {
   url: "https://vprzhxqgotxrmrjslzll.supabase.co",
-  key: "sb_publishable_tQQWuI1oZN3VQ814S3eFOg_4Mi25nFD"
+  key: "sb_publishable_tQQWuI1oZN3VQ814S3eFOg_4Mi25nFD",
+  inviteWorkerFunctionName: "invite-company-worker"
 };
 
 (function initSupabaseGlobal() {
@@ -78,58 +79,59 @@ window.refreshAuthContext = async function refreshAuthContext(sessionOverride) {
       }
       session = sessionData?.session || null;
     }
-  const user = session?.user || null;
 
-  window.appAuth.session = session;
-  window.appAuth.user = user;
-  window.appAuth.profile = null;
-  window.appAuth.membership = null;
-  window.appAuth.companyId = null;
-  window.appAuth.companyRole = null;
+    const user = session?.user || null;
 
-  if (!user) {
-    return {
-      ok: true,
-      loggedIn: false
-    };
-  }
+    window.appAuth.session = session;
+    window.appAuth.user = user;
+    window.appAuth.profile = null;
+    window.appAuth.membership = null;
+    window.appAuth.companyId = null;
+    window.appAuth.companyRole = null;
 
-  const { data: profile, error: profileError } = await window.sb
-    .from("profiles")
-    .select("id, email, full_name, is_active")
-    .eq("id", user.id)
-    .maybeSingle();
+    if (!user) {
+      return {
+        ok: true,
+        loggedIn: false
+      };
+    }
 
-  if (profileError) {
-    console.error("Błąd pobierania profilu:", profileError);
-    return {
-      ok: false,
-      reason: "profile_error",
-      error: profileError
-    };
-  }
+    const { data: profile, error: profileError } = await window.sb
+      .from("profiles")
+      .select("id, email, full_name, is_active")
+      .eq("id", user.id)
+      .maybeSingle();
 
-  const { data: membership, error: membershipError } = await window.sb
-    .from("company_members")
-    .select("id, role, company_id, is_active")
-    .eq("user_id", user.id)
-    .eq("is_active", true)
-    .limit(1)
-    .maybeSingle();
+    if (profileError) {
+      console.error("Błąd pobierania profilu:", profileError);
+      return {
+        ok: false,
+        reason: "profile_error",
+        error: profileError
+      };
+    }
 
-  if (membershipError) {
-    console.error("Błąd pobierania company_members:", membershipError);
-    return {
-      ok: false,
-      reason: "membership_error",
-      error: membershipError
-    };
-  }
+    const { data: membership, error: membershipError } = await window.sb
+      .from("company_members")
+      .select("id, user_id, role, company_id, is_active")
+      .eq("user_id", user.id)
+      .eq("is_active", true)
+      .limit(1)
+      .maybeSingle();
 
-  window.appAuth.profile = profile || null;
-  window.appAuth.membership = membership || null;
-  window.appAuth.companyId = membership?.company_id || null;
-  window.appAuth.companyRole = membership?.role || null;
+    if (membershipError) {
+      console.error("Błąd pobierania company_members:", membershipError);
+      return {
+        ok: false,
+        reason: "membership_error",
+        error: membershipError
+      };
+    }
+
+    window.appAuth.profile = profile || null;
+    window.appAuth.membership = membership || null;
+    window.appAuth.companyId = membership?.company_id || null;
+    window.appAuth.companyRole = membership?.role || null;
 
     return {
       ok: true,
@@ -165,7 +167,98 @@ window.signOutApp = async function signOutApp() {
 
   const { error } = await window.sb.auth.signOut();
   if (error) throw error;
+};
 
+window.fetchCompanyUsers = async function fetchCompanyUsers(companyIdOverride) {
+  if (!window.sb) throw new Error("Brak klienta Supabase.");
+
+  const companyId = companyIdOverride || window.appAuth?.companyId;
+  if (!companyId) throw new Error("Brak company_id w kontekście użytkownika.");
+
+  const { data: members, error: membersError } = await window.sb
+    .from("company_members")
+    .select("id, user_id, role, company_id, is_active")
+    .eq("company_id", companyId)
+    .order("role", { ascending: true });
+
+  if (membersError) throw membersError;
+
+  const userIds = [...new Set((members || []).map(m => m?.user_id).filter(Boolean))];
+  let profilesById = new Map();
+
+  if (userIds.length) {
+    const { data: profiles, error: profilesError } = await window.sb
+      .from("profiles")
+      .select("id, email, full_name, is_active")
+      .in("id", userIds);
+
+    if (profilesError) throw profilesError;
+    profilesById = new Map((profiles || []).map(p => [p.id, p]));
+  }
+
+  return (members || []).map(member => {
+    const profile = profilesById.get(member.user_id) || null;
+    return {
+      id: member.id,
+      user_id: member.user_id,
+      company_id: member.company_id,
+      role: member.role,
+      is_active: !!member.is_active,
+      email: profile?.email || "—",
+      full_name: profile?.full_name || "",
+      profile_is_active: profile?.is_active !== false
+    };
+  }).sort((a, b) => {
+    if (a.role === 'owner' && b.role !== 'owner') return -1;
+    if (a.role !== 'owner' && b.role === 'owner') return 1;
+    return String(a.email || '').localeCompare(String(b.email || ''), 'pl');
+  });
+};
+
+window.updateCompanyMember = async function updateCompanyMember(memberId, updates = {}) {
+  if (!window.sb) throw new Error("Brak klienta Supabase.");
+  if (!memberId) throw new Error("Brak id membershipu.");
+
+  const payload = {};
+  if (typeof updates.role === 'string' && updates.role.trim()) payload.role = updates.role.trim();
+  if (typeof updates.is_active === 'boolean') payload.is_active = updates.is_active;
+
+  if (!Object.keys(payload).length) {
+    throw new Error("Brak zmian do zapisania.");
+  }
+
+  const { data, error } = await window.sb
+    .from('company_members')
+    .update(payload)
+    .eq('id', memberId)
+    .select('id, user_id, role, company_id, is_active')
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+};
+
+window.inviteCompanyWorker = async function inviteCompanyWorker(email, role = 'worker') {
+  if (!window.sb) throw new Error("Brak klienta Supabase.");
+
+  const companyId = window.appAuth?.companyId;
+  if (!companyId) throw new Error("Brak company_id w kontekście użytkownika.");
+
+  const functionName = String(window.APP_SUPABASE_CONFIG?.inviteWorkerFunctionName || '').trim();
+  if (!functionName) {
+    throw new Error("Brak nazwy Edge Function dla zaproszeń. Skonfiguruj inviteWorkerFunctionName.");
+  }
+
+  const { data, error } = await window.sb.functions.invoke(functionName, {
+    body: {
+      email,
+      companyId,
+      role
+    }
+  });
+
+  if (error) throw error;
+  return data || null;
 };
 
 window.testSupabaseConnection = async function testSupabaseConnection() {

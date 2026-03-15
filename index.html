@@ -203,6 +203,66 @@
         </div>
       </section>
 
+
+      <section class="tabPanel hidden" data-tab-panel="users">
+        <div class="card">
+          <div class="cardHeader">
+            <div>
+              <h2>Użytkownicy firmy</h2>
+              <p class="text-secondary">Owner zarządza kontami, rolami i aktywnością pracowników.</p>
+            </div>
+          </div>
+
+          <div class="users-admin-grid">
+            <div class="users-admin-block">
+              <div class="editor-header" style="margin-bottom:var(--space-3)">
+                <div>
+                  <h4 class="editor-title">Dodaj pracownika</h4>
+                  <span class="editor-hint">Bezpieczny flow przez Edge Function, bez admin API w przeglądarce.</span>
+                </div>
+              </div>
+              <div class="form-row form-row-2" style="margin-bottom:var(--space-3)">
+                <label>Adres e-mail<input type="email" id="inviteWorkerEmailInput" placeholder="pracownik@firma.pl" autocomplete="email" /></label>
+                <label>Rola
+                  <select id="inviteWorkerRoleSelect">
+                    <option value="worker" selected>worker</option>
+                  </select>
+                </label>
+              </div>
+              <div class="users-admin-actions">
+                <button type="button" class="btn btn-primary" id="inviteWorkerBtn">Dodaj pracownika</button>
+              </div>
+              <p class="text-muted" style="margin-top:var(--space-3);font-size:var(--text-sm)">
+                Jeśli backendowy endpoint zaproszeń nie jest jeszcze wdrożony, formularz pokaże jasny komunikat zamiast udawać magię.
+              </p>
+            </div>
+
+            <div class="users-admin-block">
+              <div class="editor-header" style="margin-bottom:var(--space-3)">
+                <div>
+                  <h4 class="editor-title">Lista użytkowników</h4>
+                  <span class="editor-hint">Email, rola i status aktywności w firmie.</span>
+                </div>
+                <button type="button" class="btn btn-secondary btn-sm" id="refreshUsersBtn">Odśwież</button>
+              </div>
+              <div class="table-container">
+                <table id="companyUsersTable">
+                  <thead>
+                    <tr>
+                      <th>E-mail</th>
+                      <th>Rola</th>
+                      <th>Status</th>
+                      <th class="text-right">Akcje</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section class="tabPanel hidden" data-tab-panel="history">
         <div class="card">
           <div class="cardHeader"><div><h2>Ostatnie akcje</h2><p class="text-secondary">Historia operacji</p></div></div>
@@ -237,6 +297,7 @@
             </div>
             <button type="button" class="tab-btn active" data-tab-target="parts"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>Magazyn Części</button>
             <button type="button" class="tab-btn" data-tab-target="machines"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>Magazyn Maszyn</button>
+            <button type="button" class="tab-btn" data-tab-target="users"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Użytkownicy</button>
             <button type="button" class="tab-btn" data-tab-target="history"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Ostatnie akcje</button>
             <button type="button" class="tab-btn" data-tab-target="catalog_suppliers"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Dostawcy</button>
             <button type="button" class="tab-btn" data-tab-target="catalog_parts"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Baza Części</button>

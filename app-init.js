@@ -385,103 +385,107 @@ function initNewPartToggle() {
   cancelBtn?.addEventListener("click", () => closeNewPartPanel({ clear: true }));
 }
 
+// === MAIN INIT ===
 
 
-let __appInitialized = false;
-
-function setAuthError(message = "") {
-  const box = document.getElementById("authErrorBox");
-  if (!box) return;
-  const msg = String(message || "").trim();
-  box.textContent = msg;
-  box.classList.toggle("hidden", !msg);
+// === Auth gate ===
+function getAuthElements() {
+  return {
+    authShell: document.getElementById("authShell"),
+    appShell: document.getElementById("appShell"),
+    loginForm: document.getElementById("authLoginForm"),
+    emailInput: document.getElementById("authEmailInput"),
+    passwordInput: document.getElementById("authPasswordInput"),
+    loginBtn: document.getElementById("authLoginBtn"),
+    errorBox: document.getElementById("authErrorBox"),
+    logoutBtn: document.getElementById("authLogoutBtn"),
+    userDisplay: document.getElementById("authUserDisplay"),
+    companyDisplay: document.getElementById("authCompanyDisplay"),
+    roleBadge: document.getElementById("authRoleBadge")
+  };
 }
 
-async function fetchCurrentCompanyName() {
-  if (!window.sb || !window.appAuth?.companyId) return "";
-  const { data, error } = await window.sb
-    .from("companies")
-    .select("name")
-    .eq("id", window.appAuth.companyId)
-    .maybeSingle();
-
-  if (error) {
-    console.error("Błąd pobierania firmy:", error);
-    return "";
-  }
-
-  return normalize(data?.name || "");
+function setAuthError(message) {
+  const { errorBox } = getAuthElements();
+  if (!errorBox) return;
+  const text = String(message || "").trim();
+  errorBox.textContent = text;
+  errorBox.classList.toggle("hidden", !text);
 }
 
-async function updateAuthChrome() {
-  const userDisplay = document.getElementById("authUserDisplay");
-  const companyDisplay = document.getElementById("authCompanyDisplay");
-  const roleBadge = document.getElementById("authRoleBadge");
-  const footer = document.getElementById("appFooter");
+function updateAuthUI() {
+  const { authShell, appShell, userDisplay, companyDisplay, roleBadge } = getAuthElements();
+  const loggedIn = !!window.appAuth?.session;
 
-  const profile = window.appAuth?.profile || null;
-  const user = window.appAuth?.user || null;
-  const role = normalize(window.appAuth?.companyRole || "");
-  const companyName = await fetchCurrentCompanyName();
+  authShell?.classList.toggle("hidden", loggedIn);
+  authShell?.setAttribute("aria-hidden", loggedIn ? "true" : "false");
+  appShell?.classList.toggle("hidden", !loggedIn);
 
-  if (userDisplay) userDisplay.textContent = normalize(profile?.full_name) || normalize(profile?.email) || normalize(user?.email) || "—";
-  if (companyDisplay) companyDisplay.textContent = companyName || "Brak firmy";
-  if (roleBadge) roleBadge.textContent = role ? role.toUpperCase() : "BRAK ROLI";
-  if (footer) {
-    footer.textContent = companyName
-      ? `Magazyn PRO v3.0 • ${companyName} • Sesja Supabase aktywna`
-      : "Magazyn PRO v3.0 • Sesja Supabase aktywna";
+  if (!loggedIn) {
+    setAuthError("");
+    return;
   }
+
+  const email = window.appAuth?.profile?.email || window.appAuth?.user?.email || "—";
+  const role = window.appAuth?.companyRole || window.appAuth?.membership?.role || "—";
+  const companyId = window.appAuth?.companyId || "—";
+
+  if (userDisplay) userDisplay.textContent = email;
+  if (companyDisplay) companyDisplay.textContent = `Firma: ${companyId}`;
+  if (roleBadge) roleBadge.textContent = String(role).toUpperCase();
+  setAuthError("");
 }
 
-function applyAuthGate(isLoggedIn) {
-  const authShell = document.getElementById("authShell");
-  const appShell = document.getElementById("appShell");
-  if (authShell) {
-    authShell.classList.toggle("hidden", !!isLoggedIn);
-    authShell.setAttribute("aria-hidden", isLoggedIn ? "true" : "false");
+async function ensureAuthSession() {
+  if (typeof window.refreshAuthContext !== "function") {
+    console.warn("Brak refreshAuthContext(). Aplikacja działa bez bramki auth.");
+    const { appShell } = getAuthElements();
+    appShell?.classList.remove("hidden");
+    return true;
   }
-  if (appShell) appShell.classList.toggle("hidden", !isLoggedIn);
-}
 
-async function ensureAppReadyForSession() {
-  if (!__appInitialized) {
-    init();
-    __appInitialized = true;
+  const result = await window.refreshAuthContext();
+  if (!result?.ok) {
+    console.error("Auth init error:", result);
   }
-  await updateAuthChrome();
-  applyAuthGate(true);
+
+  updateAuthUI();
+  return !!window.appAuth?.session;
 }
 
 function bindAuthUI() {
-  const form = document.getElementById("authLoginForm");
-  const logoutBtn = document.getElementById("authLogoutBtn");
+  if (window.__authUIBound) return;
+  window.__authUIBound = true;
 
-  form?.addEventListener("submit", async (e) => {
+  const { loginForm, emailInput, passwordInput, loginBtn, logoutBtn } = getAuthElements();
+
+  loginForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const email = normalize(document.getElementById("authEmailInput")?.value || "");
-    const password = String(document.getElementById("authPasswordInput")?.value || "");
-    const loginBtn = document.getElementById("authLoginBtn");
+    setAuthError("");
+
+    const email = String(emailInput?.value || "").trim();
+    const password = String(passwordInput?.value || "");
 
     if (!email || !password) {
-      setAuthError("Podaj email i hasło.");
+      setAuthError("Podaj e-mail i hasło.");
       return;
     }
 
-    setAuthError("");
     if (loginBtn) {
       loginBtn.disabled = true;
       loginBtn.textContent = "Logowanie...";
     }
 
     try {
-      await signInWithPassword(email, password);
-      await ensureAppReadyForSession();
-      document.getElementById("authPasswordInput") && (document.getElementById("authPasswordInput").value = "");
-      toast("Zalogowano", "Sesja została uruchomiona.", "success");
-    } catch (error) {
-      console.error("Błąd logowania:", error);
-      setAuthError(error?.message || "Nie udało się zalogować.");
+      await window.signInWithPassword(email, password);
+      updateAuthUI();
+      passwordInput && (passwordInput.value = "");
+      if (!window.__appInitialized) {
+        await init();
+      }
+    } catch (err) {
+      console.error(err);
+      setAuthError(err?.message || "Nie udało się zalogować.");
     } finally {
       if (loginBtn) {
         loginBtn.disabled = false;
@@ -492,49 +496,22 @@ function bindAuthUI() {
 
   logoutBtn?.addEventListener("click", async () => {
     try {
-      await signOutApp();
-      applyAuthGate(false);
-      setAuthError("");
-      toast("Wylogowano", "Sesja została zakończona.", "success");
-    } catch (error) {
-      console.error("Błąd wylogowania:", error);
-      toast("Błąd wylogowania", error?.message || "Nie udało się wylogować.", "error");
+      await window.signOutApp();
+      window.__appInitialized = false;
+      updateAuthUI();
+      window.location.reload();
+    } catch (err) {
+      console.error(err);
+      setAuthError(err?.message || "Nie udało się wylogować.");
     }
+  });
+
+  window.sb?.auth?.onAuthStateChange?.(async () => {
+    await ensureAuthSession();
   });
 }
 
-async function bootApplicationWithAuth() {
-  bindAuthUI();
-
-  if (!window.sb) {
-    applyAuthGate(false);
-    setAuthError("Brak połączenia z Supabase. Sprawdź konfigurację app-supabase.js.");
-    return;
-  }
-
-  const result = await refreshAuthContext();
-  if (result?.ok && result?.loggedIn) {
-    await ensureAppReadyForSession();
-  } else {
-    applyAuthGate(false);
-    setAuthError("");
-  }
-
-  if (window.sb?.auth?.onAuthStateChange) {
-    window.sb.auth.onAuthStateChange(async (_event, session) => {
-      window.appAuth.session = session || null;
-      const refreshed = await refreshAuthContext();
-      if (refreshed?.ok && refreshed?.loggedIn) {
-        await ensureAppReadyForSession();
-      } else {
-        applyAuthGate(false);
-      }
-    });
-  }
-}
-
-// === MAIN INIT ===
-function init() {
+async function init() {
   initThresholdsToggle();
   initNewPartToggle();
   initStockEditMode();
@@ -543,6 +520,13 @@ function init() {
     const h = document.createElement("div");
     h.className = "toast-host";
     document.body.appendChild(h);
+  }
+
+  bindAuthUI();
+  const hasSession = await ensureAuthSession();
+  if (!hasSession) {
+    document.getElementById("authEmailInput")?.focus?.();
+    return;
   }
   
   load();
@@ -654,6 +638,7 @@ function init() {
   }
 
   save();
+  window.__appInitialized = true;
 }
 
 // === Unsaved changes warning ===
@@ -1695,4 +1680,4 @@ function cancelEditPart() {
 }
 
 // Start the app
-document.addEventListener('DOMContentLoaded', bootApplicationWithAuth);
+document.addEventListener('DOMContentLoaded', () => { init().catch(err => console.error("Init error:", err)); });

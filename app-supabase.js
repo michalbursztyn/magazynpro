@@ -31,7 +31,13 @@ window.APP_SUPABASE_CONFIG = {
     return;
   }
 
-  const client = window.supabase.createClient(url, key);
+  const client = window.supabase.createClient(url, key, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: false
+    }
+  });
 
   window.sb = client;
   window.appAuth = {
@@ -45,25 +51,33 @@ window.APP_SUPABASE_CONFIG = {
   };
 })();
 
-window.refreshAuthContext = async function refreshAuthContext() {
-  if (!window.sb) {
-    return {
-      ok: false,
-      reason: "missing_client"
-    };
-  }
+window.__authRefreshInFlight = null;
 
-  const { data: sessionData, error: sessionError } = await window.sb.auth.getSession();
-  if (sessionError) {
-    console.error("Błąd getSession:", sessionError);
-    return {
-      ok: false,
-      reason: "session_error",
-      error: sessionError
-    };
-  }
+window.refreshAuthContext = async function refreshAuthContext(sessionOverride) {
+  if (window.__authRefreshInFlight) return window.__authRefreshInFlight;
 
-  const session = sessionData?.session || null;
+  window.__authRefreshInFlight = (async () => {
+    if (!window.sb) {
+      return {
+        ok: false,
+        reason: "missing_client"
+      };
+    }
+
+    let session = (typeof sessionOverride !== "undefined") ? (sessionOverride || null) : null;
+
+    if (typeof sessionOverride === "undefined") {
+      const { data: sessionData, error: sessionError } = await window.sb.auth.getSession();
+      if (sessionError) {
+        console.error("Błąd getSession:", sessionError);
+        return {
+          ok: false,
+          reason: "session_error",
+          error: sessionError
+        };
+      }
+      session = sessionData?.session || null;
+    }
   const user = session?.user || null;
 
   window.appAuth.session = session;
@@ -117,13 +131,20 @@ window.refreshAuthContext = async function refreshAuthContext() {
   window.appAuth.companyId = membership?.company_id || null;
   window.appAuth.companyRole = membership?.role || null;
 
-  return {
-    ok: true,
-    loggedIn: true,
-    user,
-    profile,
-    membership
-  };
+    return {
+      ok: true,
+      loggedIn: true,
+      user,
+      profile,
+      membership
+    };
+  })();
+
+  try {
+    return await window.__authRefreshInFlight;
+  } finally {
+    window.__authRefreshInFlight = null;
+  }
 };
 
 window.signInWithPassword = async function signInWithPassword(email, password) {
@@ -136,7 +157,6 @@ window.signInWithPassword = async function signInWithPassword(email, password) {
 
   if (error) throw error;
 
-  await window.refreshAuthContext();
   return data;
 };
 
@@ -146,7 +166,6 @@ window.signOutApp = async function signOutApp() {
   const { error } = await window.sb.auth.signOut();
   if (error) throw error;
 
-  await window.refreshAuthContext();
 };
 
 window.testSupabaseConnection = async function testSupabaseConnection() {

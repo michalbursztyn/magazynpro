@@ -505,10 +505,6 @@ function bindAuthUI() {
     try {
       await window.signInWithPassword(email, password);
       passwordInput && (passwordInput.value = "");
-      const hasSession = await ensureAuthSession();
-      if (hasSession && !window.__appInitialized) {
-        await init();
-      }
     } catch (err) {
       console.error(err);
       setAuthLocked(true);
@@ -541,7 +537,24 @@ function bindAuthUI() {
       window.appAuth.user = session?.user || null;
     }
 
-    const hasSession = await ensureAuthSession();
+    const result = (typeof window.refreshAuthContext === "function")
+      ? await window.refreshAuthContext(session || null)
+      : { ok: false };
+
+    if (!result?.ok) {
+      setAuthLocked(true);
+      setAuthError("Nie udało się odświeżyć sesji użytkownika.");
+      return;
+    }
+
+    updateAuthUI();
+
+    const hasSession = !!window.appAuth?.session;
+    if (hasSession && !window.__appInitialized) {
+      await init();
+      return;
+    }
+
     if (!hasSession) {
       window.__appInitialized = false;
       passwordInput && (passwordInput.value = "");

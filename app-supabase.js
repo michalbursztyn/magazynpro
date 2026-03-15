@@ -265,20 +265,40 @@ window.createCompanyWorker = async function createCompanyWorker(payload = {}) {
     throw new Error("Brak aktywnej sesji użytkownika. Zaloguj się ponownie.");
   }
 
-  const { data, error } = await window.sb.functions.invoke(functionName, {
-    body: {
+  const supabaseUrl = String(window.APP_SUPABASE_CONFIG?.url || "").trim().replace(/\/$/, "");
+  const supabaseKey = String(window.APP_SUPABASE_CONFIG?.key || "").trim();
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error("Brak konfiguracji Supabase URL lub key.");
+  }
+
+  const response = await fetch(`${supabaseUrl}/functions/v1/${functionName}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": supabaseKey,
+      "Authorization": `Bearer ${accessToken}`
+    },
+    body: JSON.stringify({
       email,
       password,
       companyId,
       role
-    },
-    headers: {
-      Authorization: `Bearer ${accessToken}`
-    }
+    })
   });
 
-  if (error) throw error;
-  return data || null;
+  let result = null;
+  try {
+    result = await response.json();
+  } catch {}
+
+  if (!response.ok) {
+    const err = new Error(result?.message || `Edge Function zwróciła błąd HTTP ${response.status}.`);
+    err.status = response.status;
+    err.payload = result;
+    throw err;
+  }
+
+  return result || null;
 };
 
 window.testSupabaseConnection = async function testSupabaseConnection() {

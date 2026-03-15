@@ -405,6 +405,24 @@ function getAuthElements() {
   };
 }
 
+function setAuthLocked(isLocked) {
+  const { authShell, appShell } = getAuthElements();
+  const locked = !!isLocked;
+
+  authShell?.classList.toggle("hidden", !locked);
+  authShell?.setAttribute("aria-hidden", locked ? "false" : "true");
+
+  appShell?.classList.toggle("hidden", locked);
+  appShell?.setAttribute("aria-hidden", locked ? "true" : "false");
+
+  if (appShell) {
+    if (locked) appShell.setAttribute("inert", "");
+    else appShell.removeAttribute("inert");
+  }
+
+  document.body.classList.toggle("auth-locked", locked);
+}
+
 function setAuthError(message) {
   const { errorBox } = getAuthElements();
   if (!errorBox) return;
@@ -414,39 +432,47 @@ function setAuthError(message) {
 }
 
 function updateAuthUI() {
-  const { authShell, appShell, userDisplay, companyDisplay, roleBadge } = getAuthElements();
+  const { userDisplay, companyDisplay, roleBadge } = getAuthElements();
   const loggedIn = !!window.appAuth?.session;
 
-  authShell?.classList.toggle("hidden", loggedIn);
-  authShell?.setAttribute("aria-hidden", loggedIn ? "true" : "false");
-  appShell?.classList.toggle("hidden", !loggedIn);
+  setAuthLocked(!loggedIn);
 
   if (!loggedIn) {
-    setAuthError("");
+    if (userDisplay) userDisplay.textContent = "—";
+    if (companyDisplay) companyDisplay.textContent = "—";
+    if (roleBadge) roleBadge.textContent = "—";
     return;
   }
 
-  const email = window.appAuth?.profile?.email || window.appAuth?.user?.email || "—";
+  const displayName = window.appAuth?.profile?.full_name || window.appAuth?.profile?.email || window.appAuth?.user?.email || "—";
+  const email = window.appAuth?.profile?.email || window.appAuth?.user?.email || "";
   const role = window.appAuth?.companyRole || window.appAuth?.membership?.role || "—";
-  const companyId = window.appAuth?.companyId || "—";
+  const companyId = window.appAuth?.companyId || null;
 
-  if (userDisplay) userDisplay.textContent = email;
-  if (companyDisplay) companyDisplay.textContent = `Firma: ${companyId}`;
+  if (userDisplay) userDisplay.textContent = displayName;
+  if (companyDisplay) {
+    companyDisplay.textContent = companyId
+      ? `${email ? `${email} • ` : ""}Firma: ${companyId}`
+      : (email || "—");
+  }
   if (roleBadge) roleBadge.textContent = String(role).toUpperCase();
   setAuthError("");
 }
 
 async function ensureAuthSession() {
   if (typeof window.refreshAuthContext !== "function") {
-    console.warn("Brak refreshAuthContext(). Aplikacja działa bez bramki auth.");
-    const { appShell } = getAuthElements();
-    appShell?.classList.remove("hidden");
-    return true;
+    console.error("Brak refreshAuthContext(). Bramka logowania pozostaje zamknięta.");
+    setAuthLocked(true);
+    setAuthError("Warstwa logowania nie została załadowana poprawnie. Sprawdź pliki skryptów Supabase.");
+    return false;
   }
 
   const result = await window.refreshAuthContext();
   if (!result?.ok) {
     console.error("Auth init error:", result);
+    setAuthLocked(true);
+    setAuthError("Nie udało się odczytać sesji. Spróbuj odświeżyć stronę lub zalogować się ponownie.");
+    return false;
   }
 
   updateAuthUI();
@@ -478,13 +504,14 @@ function bindAuthUI() {
 
     try {
       await window.signInWithPassword(email, password);
-      updateAuthUI();
       passwordInput && (passwordInput.value = "");
-      if (!window.__appInitialized) {
+      const hasSession = await ensureAuthSession();
+      if (hasSession && !window.__appInitialized) {
         await init();
       }
     } catch (err) {
       console.error(err);
+      setAuthLocked(true);
       setAuthError(err?.message || "Nie udało się zalogować.");
     } finally {
       if (loginBtn) {
@@ -498,16 +525,27 @@ function bindAuthUI() {
     try {
       await window.signOutApp();
       window.__appInitialized = false;
+      setAuthError("");
       updateAuthUI();
-      window.location.reload();
+      passwordInput && (passwordInput.value = "");
+      emailInput?.focus?.();
     } catch (err) {
       console.error(err);
       setAuthError(err?.message || "Nie udało się wylogować.");
     }
   });
 
-  window.sb?.auth?.onAuthStateChange?.(async () => {
-    await ensureAuthSession();
+  window.sb?.auth?.onAuthStateChange?.(async (_event, session) => {
+    if (window.appAuth) {
+      window.appAuth.session = session || null;
+      window.appAuth.user = session?.user || null;
+    }
+
+    const hasSession = await ensureAuthSession();
+    if (!hasSession) {
+      window.__appInitialized = false;
+      passwordInput && (passwordInput.value = "");
+    }
   });
 }
 

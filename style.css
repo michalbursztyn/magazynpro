@@ -2508,10 +2508,16 @@ body.part-details-open {
 
 /* ---------- Auth Gate ---------- */
 .auth-shell {
+  position: fixed;
+  inset: 0;
   min-height: 100vh;
   display: grid;
   place-items: center;
   padding: var(--space-6);
+  background:
+    linear-gradient(180deg, rgba(9, 10, 14, 0.92), rgba(9, 10, 14, 0.97)),
+    var(--bg-gradient-1), var(--bg-gradient-2), var(--bg-gradient-3);
+  z-index: 10000;
 }
 
 .auth-card {

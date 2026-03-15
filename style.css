@@ -2504,3 +2504,122 @@ body.part-details-open {
   font-size: var(--text-xs);
   color: var(--text-tertiary);
 }
+
+
+/* ---------- 23) Auth Gate ---------- */
+.auth-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: clamp(20px, 5vw, 48px);
+}
+
+.auth-card {
+  width: min(460px, 100%);
+  padding: clamp(20px, 4vw, 32px);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border);
+  background: rgba(19, 19, 22, 0.92);
+  box-shadow: var(--shadow-xl);
+  backdrop-filter: blur(20px);
+}
+
+.auth-card-head {
+  margin-bottom: var(--space-5);
+}
+
+.auth-card-head h2 {
+  margin: var(--space-3) 0 var(--space-2);
+}
+
+.auth-card-head p,
+.auth-note {
+  color: var(--text-secondary);
+}
+
+.auth-form {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.auth-form .btn {
+  margin-top: var(--space-2);
+  min-height: 44px;
+}
+
+.auth-error {
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.12);
+  color: #fecaca;
+  font-size: var(--text-sm);
+}
+
+.auth-note {
+  margin-top: var(--space-4);
+  font-size: var(--text-sm);
+}
+
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.app-header-main {
+  min-width: 0;
+}
+
+.auth-userbar {
+  min-width: 260px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.auth-userbar-meta {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.auth-userbar-meta strong,
+.auth-userbar-meta span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.auth-userbar-kicker {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+}
+
+.auth-userbar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+@media (max-width: 900px) {
+  .app-header {
+    flex-direction: column;
+  }
+
+  .auth-userbar {
+    width: 100%;
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+}

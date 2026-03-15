@@ -11,14 +11,44 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <main class="appShell">
+  <div class="auth-shell hidden" id="authShell" aria-hidden="true">
+    <div class="auth-card">
+      <div class="auth-card-head">
+        <span class="badge badge-accent">Supabase Auth</span>
+        <h2>Logowanie do Magazyn PRO</h2>
+        <p>Zaloguj się kontem firmowym, żeby wejść do systemu.</p>
+      </div>
+      <form id="authLoginForm" class="auth-form" autocomplete="on">
+        <label>Adres e-mail<input type="email" id="authEmailInput" placeholder="twoj@firma.pl" autocomplete="email" required /></label>
+        <label>Hasło<input type="password" id="authPasswordInput" placeholder="••••••••" autocomplete="current-password" required /></label>
+        <button type="submit" class="btn btn-primary" id="authLoginBtn">Zaloguj</button>
+      </form>
+      <div class="auth-error hidden" id="authErrorBox" role="alert" aria-live="assertive"></div>
+      <p class="auth-note">Na tym etapie dane magazynowe nadal działają lokalnie, ale wejście do aplikacji wymaga już sesji użytkownika.</p>
+    </div>
+  </div>
+
+  <main class="appShell hidden" id="appShell">
     <div class="appMain">
       <header class="app-header">
-        <h1>Magazyn <span class="logo-accent">PRO</span></h1>
-        <p class="text-secondary">
-          <strong>Nazwa (ID)</strong> to unikalny identyfikator. <strong>Typ</strong> to opis/kategoria.
-          Zużycie: <strong>FIFO</strong>.
-        </p>
+        <div class="app-header-main">
+          <h1>Magazyn <span class="logo-accent">PRO</span></h1>
+          <p class="text-secondary">
+            <strong>Nazwa (ID)</strong> to unikalny identyfikator. <strong>Typ</strong> to opis/kategoria.
+            Zużycie: <strong>FIFO</strong>.
+          </p>
+        </div>
+        <div class="auth-userbar" id="authUserBar">
+          <div class="auth-userbar-meta">
+            <span class="auth-userbar-kicker">Zalogowano</span>
+            <strong id="authUserDisplay">—</strong>
+            <span id="authCompanyDisplay">—</span>
+          </div>
+          <div class="auth-userbar-actions">
+            <span class="badge" id="authRoleBadge">—</span>
+            <button type="button" class="btn btn-secondary btn-sm" id="authLogoutBtn">Wyloguj</button>
+          </div>
+        </div>
       </header>
 
       <section class="tabPanel widePanel" data-tab-panel="parts">
@@ -192,7 +222,7 @@
         </div>
       </section>
 
-      <footer class="app-footer">Magazyn PRO v3.0 • Dane zapisywane lokalnie</footer>
+      <footer class="app-footer" id="appFooter">Magazyn PRO v3.0 • Dane zapisywane lokalnie</footer>
     </div>
 
     <aside class="globalSide" aria-label="Panel boczny">
@@ -382,11 +412,8 @@
     </div>
   </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app-supabase.js"></script>
-<script src="app-core.js"></script>
-<script src="app-ui.js"></script>
-<script src="app-init.js"></script>
-
+  <script src="app-core.js"></script>
+  <script src="app-ui.js"></script>
+  <script src="app-init.js"></script>
 </body>
 </html>

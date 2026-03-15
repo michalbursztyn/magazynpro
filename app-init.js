@@ -385,6 +385,154 @@ function initNewPartToggle() {
   cancelBtn?.addEventListener("click", () => closeNewPartPanel({ clear: true }));
 }
 
+
+
+let __appInitialized = false;
+
+function setAuthError(message = "") {
+  const box = document.getElementById("authErrorBox");
+  if (!box) return;
+  const msg = String(message || "").trim();
+  box.textContent = msg;
+  box.classList.toggle("hidden", !msg);
+}
+
+async function fetchCurrentCompanyName() {
+  if (!window.sb || !window.appAuth?.companyId) return "";
+  const { data, error } = await window.sb
+    .from("companies")
+    .select("name")
+    .eq("id", window.appAuth.companyId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Błąd pobierania firmy:", error);
+    return "";
+  }
+
+  return normalize(data?.name || "");
+}
+
+async function updateAuthChrome() {
+  const userDisplay = document.getElementById("authUserDisplay");
+  const companyDisplay = document.getElementById("authCompanyDisplay");
+  const roleBadge = document.getElementById("authRoleBadge");
+  const footer = document.getElementById("appFooter");
+
+  const profile = window.appAuth?.profile || null;
+  const user = window.appAuth?.user || null;
+  const role = normalize(window.appAuth?.companyRole || "");
+  const companyName = await fetchCurrentCompanyName();
+
+  if (userDisplay) userDisplay.textContent = normalize(profile?.full_name) || normalize(profile?.email) || normalize(user?.email) || "—";
+  if (companyDisplay) companyDisplay.textContent = companyName || "Brak firmy";
+  if (roleBadge) roleBadge.textContent = role ? role.toUpperCase() : "BRAK ROLI";
+  if (footer) {
+    footer.textContent = companyName
+      ? `Magazyn PRO v3.0 • ${companyName} • Sesja Supabase aktywna`
+      : "Magazyn PRO v3.0 • Sesja Supabase aktywna";
+  }
+}
+
+function applyAuthGate(isLoggedIn) {
+  const authShell = document.getElementById("authShell");
+  const appShell = document.getElementById("appShell");
+  if (authShell) {
+    authShell.classList.toggle("hidden", !!isLoggedIn);
+    authShell.setAttribute("aria-hidden", isLoggedIn ? "true" : "false");
+  }
+  if (appShell) appShell.classList.toggle("hidden", !isLoggedIn);
+}
+
+async function ensureAppReadyForSession() {
+  if (!__appInitialized) {
+    init();
+    __appInitialized = true;
+  }
+  await updateAuthChrome();
+  applyAuthGate(true);
+}
+
+function bindAuthUI() {
+  const form = document.getElementById("authLoginForm");
+  const logoutBtn = document.getElementById("authLogoutBtn");
+
+  form?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = normalize(document.getElementById("authEmailInput")?.value || "");
+    const password = String(document.getElementById("authPasswordInput")?.value || "");
+    const loginBtn = document.getElementById("authLoginBtn");
+
+    if (!email || !password) {
+      setAuthError("Podaj email i hasło.");
+      return;
+    }
+
+    setAuthError("");
+    if (loginBtn) {
+      loginBtn.disabled = true;
+      loginBtn.textContent = "Logowanie...";
+    }
+
+    try {
+      await signInWithPassword(email, password);
+      await ensureAppReadyForSession();
+      document.getElementById("authPasswordInput") && (document.getElementById("authPasswordInput").value = "");
+      toast("Zalogowano", "Sesja została uruchomiona.", "success");
+    } catch (error) {
+      console.error("Błąd logowania:", error);
+      setAuthError(error?.message || "Nie udało się zalogować.");
+    } finally {
+      if (loginBtn) {
+        loginBtn.disabled = false;
+        loginBtn.textContent = "Zaloguj";
+      }
+    }
+  });
+
+  logoutBtn?.addEventListener("click", async () => {
+    try {
+      await signOutApp();
+      applyAuthGate(false);
+      setAuthError("");
+      toast("Wylogowano", "Sesja została zakończona.", "success");
+    } catch (error) {
+      console.error("Błąd wylogowania:", error);
+      toast("Błąd wylogowania", error?.message || "Nie udało się wylogować.", "error");
+    }
+  });
+}
+
+async function bootApplicationWithAuth() {
+  bindAuthUI();
+
+  if (!window.sb) {
+    applyAuthGate(false);
+    setAuthError("Brak połączenia z Supabase. Sprawdź konfigurację app-supabase.js.");
+    return;
+  }
+
+  const result = await refreshAuthContext();
+  if (result?.ok && result?.loggedIn) {
+    await ensureAppReadyForSession();
+  } else {
+    applyAuthGate(false);
+    setAuthError("");
+  }
+
+  if (window.sb?.auth?.onAuthStateChange) {
+    window.sb.auth.onAuthStateChange(async (_event, session) => {
+      window.appAuth.session = session || null;
+      const refreshed = await refreshAuthContext();
+      if (refreshed?.ok && refreshed?.loggedIn) {
+        await ensureAppReadyForSession();
+      } else {
+        applyAuthGate(false);
+      }
+    });
+  }
+}
+
 // === MAIN INIT ===
 function init() {
   initThresholdsToggle();
@@ -1547,4 +1695,4 @@ function cancelEditPart() {
 }
 
 // Start the app
-document.addEventListener('DOMContentLoaded', init);
+document.addEventListener('DOMContentLoaded', bootApplicationWithAuth);

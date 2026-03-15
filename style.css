@@ -2744,7 +2744,7 @@ body.part-details-open {
 
 .account-settings-shell {
   position: relative;
-  width: min(920px, 100%);
+  width: min(760px, 100%);
   max-height: calc(100vh - clamp(32px, 6vw, 64px));
 }
 
@@ -2788,12 +2788,9 @@ body.part-details-open {
 }
 
 .account-settings-head {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-4);
   padding-right: 52px;
-  margin-bottom: var(--space-5);
-  padding-bottom: var(--space-4);
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-3);
   border-bottom: 1px solid var(--border);
 }
 
@@ -2808,40 +2805,29 @@ body.part-details-open {
 }
 
 .account-settings-title {
-  font-size: clamp(1.3rem, 1rem + 1vw, 1.8rem);
-  margin-bottom: var(--space-1);
-}
-
-.account-settings-subtitle {
-  color: var(--text-secondary);
-  max-width: 760px;
+  font-size: 1.15rem;
+  margin: 0;
 }
 
 .account-settings-section + .account-settings-section {
-  margin-top: var(--space-5);
+  margin-top: var(--space-4);
 }
 
 .account-settings-section-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  gap: var(--space-4);
-  margin-bottom: var(--space-3);
+  margin-bottom: var(--space-2);
 }
 
 .account-settings-section-head h4 {
-  margin: 0 0 var(--space-1);
-}
-
-.account-settings-section-head p {
   margin: 0;
   font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
   color: var(--text-secondary);
+  letter-spacing: 0.01em;
 }
 
 .account-settings-stats {
   display: grid;
-  gap: var(--space-3);
+  gap: var(--space-2);
   margin-bottom: 0;
 }
 
@@ -2849,11 +2835,65 @@ body.part-details-open {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.account-settings-form {
-  padding: var(--space-4);
+.account-settings-info-card {
+  min-width: 0;
+  padding: 12px 14px;
   background: var(--surface-1);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
+}
+
+.account-settings-info-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+}
+
+.account-settings-info-value {
+  display: block;
+  font-size: 1rem;
+  line-height: 1.3;
+  font-weight: var(--font-semibold);
+  color: var(--text);
+}
+
+.account-settings-form {
+  padding: 14px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.account-settings-password-grid {
+  margin-bottom: var(--space-2);
+}
+
+.account-settings-password-grid label {
+  gap: 6px;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.account-settings-password-grid input {
+  padding: 10px 12px;
+  font-size: var(--text-sm);
+}
+
+.account-settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--space-3);
+}
+
+.account-settings-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
 }
 
 .account-value-break {
@@ -2889,5 +2929,15 @@ body.account-settings-open {
 @media (max-width: 640px) {
   .account-settings-panel {
     padding: var(--space-4);
+  }
+
+  .account-settings-actions,
+  .account-settings-footer {
+    justify-content: stretch;
+  }
+
+  .account-settings-actions .btn,
+  .account-settings-footer .btn {
+    width: 100%;
   }
 }

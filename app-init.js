@@ -405,6 +405,24 @@ function getAuthElements() {
   };
 }
 
+function setAuthLocked(isLocked) {
+  const { authShell, appShell } = getAuthElements();
+  const locked = !!isLocked;
+
+  authShell?.classList.toggle("hidden", !locked);
+  authShell?.setAttribute("aria-hidden", locked ? "false" : "true");
+
+  appShell?.classList.toggle("hidden", locked);
+  appShell?.setAttribute("aria-hidden", locked ? "true" : "false");
+
+  if (appShell) {
+    if (locked) appShell.setAttribute("inert", "");
+    else appShell.removeAttribute("inert");
+  }
+
+  document.body.classList.toggle("auth-locked", locked);
+}
+
 function setAuthError(message) {
   const { errorBox } = getAuthElements();
   if (!errorBox) return;
@@ -414,40 +432,47 @@ function setAuthError(message) {
 }
 
 function updateAuthUI() {
-  const { authShell, appShell, userDisplay, companyDisplay, roleBadge } = getAuthElements();
+  const { userDisplay, companyDisplay, roleBadge } = getAuthElements();
   const loggedIn = !!window.appAuth?.session;
 
-  authShell?.classList.toggle("hidden", loggedIn);
-  authShell?.setAttribute("aria-hidden", loggedIn ? "true" : "false");
-  appShell?.classList.toggle("hidden", !loggedIn);
+  setAuthLocked(!loggedIn);
 
   if (!loggedIn) {
-    setAuthError("");
+    if (userDisplay) userDisplay.textContent = "—";
+    if (companyDisplay) companyDisplay.textContent = "—";
+    if (roleBadge) roleBadge.textContent = "—";
     return;
   }
 
-  const email = window.appAuth?.profile?.email || window.appAuth?.user?.email || "—";
+  const displayName = window.appAuth?.profile?.full_name || window.appAuth?.profile?.email || window.appAuth?.user?.email || "—";
+  const email = window.appAuth?.profile?.email || window.appAuth?.user?.email || "";
   const role = window.appAuth?.companyRole || window.appAuth?.membership?.role || "—";
-  const companyId = window.appAuth?.companyId || "—";
+  const companyId = window.appAuth?.companyId || null;
 
-  if (userDisplay) userDisplay.textContent = email;
-  if (companyDisplay) companyDisplay.textContent = `Firma: ${companyId}`;
+  if (userDisplay) userDisplay.textContent = displayName;
+  if (companyDisplay) {
+    companyDisplay.textContent = companyId
+      ? `${email ? `${email} • ` : ""}Firma: ${companyId}`
+      : (email || "—");
+  }
   if (roleBadge) roleBadge.textContent = String(role).toUpperCase();
-  applyRoleAccessToUI();
   setAuthError("");
 }
 
 async function ensureAuthSession() {
   if (typeof window.refreshAuthContext !== "function") {
-    console.warn("Brak refreshAuthContext(). Aplikacja działa bez bramki auth.");
-    const { appShell } = getAuthElements();
-    appShell?.classList.remove("hidden");
-    return true;
+    console.error("Brak refreshAuthContext(). Bramka logowania pozostaje zamknięta.");
+    setAuthLocked(true);
+    setAuthError("Warstwa logowania nie została załadowana poprawnie. Sprawdź pliki skryptów Supabase.");
+    return false;
   }
 
   const result = await window.refreshAuthContext();
   if (!result?.ok) {
     console.error("Auth init error:", result);
+    setAuthLocked(true);
+    setAuthError("Nie udało się odczytać sesji. Spróbuj odświeżyć stronę lub zalogować się ponownie.");
+    return false;
   }
 
   updateAuthUI();
@@ -479,13 +504,10 @@ function bindAuthUI() {
 
     try {
       await window.signInWithPassword(email, password);
-      updateAuthUI();
       passwordInput && (passwordInput.value = "");
-      if (!window.__appInitialized) {
-        await init();
-      }
     } catch (err) {
       console.error(err);
+      setAuthLocked(true);
       setAuthError(err?.message || "Nie udało się zalogować.");
     } finally {
       if (loginBtn) {
@@ -499,117 +521,50 @@ function bindAuthUI() {
     try {
       await window.signOutApp();
       window.__appInitialized = false;
+      setAuthError("");
       updateAuthUI();
-      window.location.reload();
+      passwordInput && (passwordInput.value = "");
+      emailInput?.focus?.();
     } catch (err) {
       console.error(err);
       setAuthError(err?.message || "Nie udało się wylogować.");
     }
   });
 
-  window.sb?.auth?.onAuthStateChange?.(async () => {
-    await ensureAuthSession();
-  });
-}
+  window.sb?.auth?.onAuthStateChange?.((_event, session) => {
+    void (async () => {
+      if (window.appAuth) {
+        window.appAuth.session = session || null;
+        window.appAuth.user = session?.user || null;
+      }
 
-function bindUsersAdminUI() {
-  if (window.__usersAdminBound) return;
-  window.__usersAdminBound = true;
+      const result = (typeof window.refreshAuthContext === "function")
+        ? await window.refreshAuthContext(session || null)
+        : { ok: false };
 
-  document.getElementById('usersRefreshBtn')?.addEventListener('click', async () => {
-    const result = await refreshCompanyUsersUI();
-    if (!result?.ok) toast('Błąd', 'Nie udało się odświeżyć listy użytkowników.', 'error');
-  });
-
-  document.getElementById('usersInviteForm')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    if (!isOwnerRole()) {
-      toast('Brak dostępu', 'Dodawanie użytkowników jest dostępne tylko dla ownera.', 'warning');
-      return;
-    }
-
-    const emailInput = document.getElementById('usersInviteEmail');
-    const roleSelect = document.getElementById('usersInviteRole');
-    const inviteBtn = document.getElementById('usersInviteBtn');
-    const email = String(emailInput?.value || '').trim().toLowerCase();
-    const role = String(roleSelect?.value || 'worker').trim().toLowerCase() || 'worker';
-
-    if (!email) {
-      toast('Brak e-maila', 'Podaj adres e-mail pracownika.', 'warning');
-      emailInput?.focus?.();
-      return;
-    }
-
-    if (inviteBtn) {
-      inviteBtn.disabled = true;
-      inviteBtn.textContent = 'Wysyłanie...';
-    }
-
-    try {
-      const result = await window.inviteCompanyWorker(email, role);
       if (!result?.ok) {
-        const code = result?.error?.context?.status || result?.error?.status || result?.error?.code || '';
-        const missingFn = String(code).includes('404') || /function/i.test(String(result?.error?.message || ''));
-        if (missingFn) {
-          toast('Brak backendu invite', 'Frontend jest gotowy, ale musisz wdrożyć Edge Function invite-company-user.', 'warning');
-        } else {
-          throw result?.error || new Error('Nie udało się wysłać zaproszenia.');
-        }
+        setAuthLocked(true);
+        setAuthError("Nie udało się odświeżyć sesji użytkownika.");
         return;
       }
 
-      toast('Zaproszenie wysłane', `Wysłano invite do ${email}.`, 'success');
-      if (emailInput) emailInput.value = '';
-      await refreshCompanyUsersUI({ silent: true });
-    } catch (err) {
-      console.error(err);
-      toast('Błąd zaproszenia', err?.message || 'Nie udało się wysłać zaproszenia.', 'error');
-    } finally {
-      if (inviteBtn) {
-        inviteBtn.disabled = false;
-        inviteBtn.textContent = 'Wyślij zaproszenie';
-      }
-    }
-  });
+      updateAuthUI();
 
-  document.getElementById('usersTableBody')?.addEventListener('click', async (e) => {
-    const btn = e.target?.closest?.('button[data-action]');
-    if (!btn) return;
-    if (!isOwnerRole()) {
-      toast('Brak dostępu', 'Ta akcja jest dostępna tylko dla ownera.', 'warning');
-      return;
-    }
-
-    const membershipId = btn.getAttribute('data-membership-id');
-    if (!membershipId) return;
-
-    try {
-      if (btn.dataset.action === 'saveUserRole') {
-        const select = document.querySelector(`.users-role-select[data-membership-id="${membershipId}"]`);
-        const role = String(select?.value || '').trim().toLowerCase();
-        if (!role) return;
-        btn.disabled = true;
-        const result = await window.updateCompanyMemberAccess(membershipId, { role });
-        if (!result?.ok) throw result?.error || new Error('Nie udało się zapisać roli.');
-        toast('Zapisano rolę', 'Rola użytkownika została zaktualizowana.', 'success');
-        await refreshCompanyUsersUI({ silent: true });
+      const hasSession = !!window.appAuth?.session;
+      if (hasSession && !window.__appInitialized) {
+        await init();
         return;
       }
 
-      if (btn.dataset.action === 'toggleUserActive') {
-        const nextActive = btn.getAttribute('data-next-active') === 'true';
-        btn.disabled = true;
-        const result = await window.updateCompanyMemberAccess(membershipId, { is_active: nextActive });
-        if (!result?.ok) throw result?.error || new Error('Nie udało się zmienić statusu użytkownika.');
-        toast(nextActive ? 'Użytkownik aktywny' : 'Użytkownik dezaktywowany', nextActive ? 'Przywrócono dostęp użytkownika.' : 'Dostęp użytkownika został wyłączony.', 'success');
-        await refreshCompanyUsersUI({ silent: true });
+      if (!hasSession) {
+        window.__appInitialized = false;
+        passwordInput && (passwordInput.value = "");
       }
-    } catch (err) {
-      console.error(err);
-      toast('Błąd', err?.message || 'Nie udało się wykonać operacji na użytkowniku.', 'error');
-    } finally {
-      btn.disabled = false;
-    }
+    })().catch((err) => {
+      console.error("Auth state change handler error:", err);
+      setAuthLocked(true);
+      setAuthError("Wystąpił błąd podczas przełączania sesji użytkownika.");
+    });
   });
 }
 
@@ -625,7 +580,6 @@ async function init() {
   }
 
   bindAuthUI();
-  bindUsersAdminUI();
   const hasSession = await ensureAuthSession();
   if (!hasSession) {
     document.getElementById("authEmailInput")?.focus?.();
@@ -741,9 +695,6 @@ async function init() {
   }
 
   save();
-  await refreshCompanyUsersUI({ silent: true });
-  applyRoleAccessToUI();
-  activateTab(document.querySelector('.tab-btn.active')?.getAttribute('data-tab-target') || getAllowedTabsForRole()[0] || 'parts');
   window.__appInitialized = true;
 }
 
@@ -1600,10 +1551,7 @@ function bindSearch() {
 
 // === Tabs ===
 function bindTabs() {
-  if (window.__tabsBound) return;
-  window.__tabsBound = true;
-
-  window.__tabRefreshers = {
+  const tabRefreshers = {
     parts: () => renderWarehouse(),
     delivery: () => { renderAllSuppliers(); refreshCatalogsUI(); renderDelivery(); },
     build: () => { refreshCatalogsUI(); renderBuild(); },
@@ -1611,19 +1559,26 @@ function bindTabs() {
     catalog_parts: () => refreshCatalogsUI(),
     catalog_suppliers: () => renderAllSuppliers(),
     catalog_machines: () => refreshCatalogsUI(),
-    history: () => renderHistory(),
-    users: () => { void refreshCompanyUsersUI({ silent: true }); }
+    history: () => renderHistory()
   };
 
   document.querySelectorAll('.tab-btn[data-tab-target]').forEach(btn => {
     btn.addEventListener('click', () => {
       const target = btn.getAttribute('data-tab-target');
-      if (!canAccessTab(target)) {
-        toast('Brak dostępu', 'Ta sekcja nie jest dostępna dla aktualnej roli.', 'warning');
-        activateTab(getAllowedTabsForRole()[0] || 'parts');
-        return;
-      }
-      activateTab(target);
+      
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      
+      document.querySelectorAll('.tabPanel').forEach(panel => {
+        if (panel.getAttribute('data-tab-panel') === target) {
+          panel.classList.remove('hidden');
+        } else {
+          panel.classList.add('hidden');
+        }
+      });
+
+      const refresh = tabRefreshers[target];
+      if (typeof refresh === 'function') refresh();
     });
   });
 }

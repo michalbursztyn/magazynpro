@@ -20,7 +20,8 @@ window.APP_SUPABASE_CONFIG = {
       profile: null,
       membership: null,
       companyId: null,
-      companyRole: null
+      companyRole: null,
+      companyUsers: []
     };
     return;
   }
@@ -31,13 +32,7 @@ window.APP_SUPABASE_CONFIG = {
     return;
   }
 
-  const client = window.supabase.createClient(url, key, {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: false
-    }
-  });
+  const client = window.supabase.createClient(url, key);
 
   window.sb = client;
   window.appAuth = {
@@ -47,37 +42,30 @@ window.APP_SUPABASE_CONFIG = {
     profile: null,
     membership: null,
     companyId: null,
-    companyRole: null
+    companyRole: null,
+    companyUsers: []
   };
 })();
 
-window.__authRefreshInFlight = null;
+window.refreshAuthContext = async function refreshAuthContext() {
+  if (!window.sb) {
+    return {
+      ok: false,
+      reason: "missing_client"
+    };
+  }
 
-window.refreshAuthContext = async function refreshAuthContext(sessionOverride) {
-  if (window.__authRefreshInFlight) return window.__authRefreshInFlight;
+  const { data: sessionData, error: sessionError } = await window.sb.auth.getSession();
+  if (sessionError) {
+    console.error("Błąd getSession:", sessionError);
+    return {
+      ok: false,
+      reason: "session_error",
+      error: sessionError
+    };
+  }
 
-  window.__authRefreshInFlight = (async () => {
-    if (!window.sb) {
-      return {
-        ok: false,
-        reason: "missing_client"
-      };
-    }
-
-    let session = (typeof sessionOverride !== "undefined") ? (sessionOverride || null) : null;
-
-    if (typeof sessionOverride === "undefined") {
-      const { data: sessionData, error: sessionError } = await window.sb.auth.getSession();
-      if (sessionError) {
-        console.error("Błąd getSession:", sessionError);
-        return {
-          ok: false,
-          reason: "session_error",
-          error: sessionError
-        };
-      }
-      session = sessionData?.session || null;
-    }
+  const session = sessionData?.session || null;
   const user = session?.user || null;
 
   window.appAuth.session = session;
@@ -86,6 +74,7 @@ window.refreshAuthContext = async function refreshAuthContext(sessionOverride) {
   window.appAuth.membership = null;
   window.appAuth.companyId = null;
   window.appAuth.companyRole = null;
+  window.appAuth.companyUsers = [];
 
   if (!user) {
     return {
@@ -131,20 +120,13 @@ window.refreshAuthContext = async function refreshAuthContext(sessionOverride) {
   window.appAuth.companyId = membership?.company_id || null;
   window.appAuth.companyRole = membership?.role || null;
 
-    return {
-      ok: true,
-      loggedIn: true,
-      user,
-      profile,
-      membership
-    };
-  })();
-
-  try {
-    return await window.__authRefreshInFlight;
-  } finally {
-    window.__authRefreshInFlight = null;
-  }
+  return {
+    ok: true,
+    loggedIn: true,
+    user,
+    profile,
+    membership
+  };
 };
 
 window.signInWithPassword = async function signInWithPassword(email, password) {
@@ -157,6 +139,7 @@ window.signInWithPassword = async function signInWithPassword(email, password) {
 
   if (error) throw error;
 
+  await window.refreshAuthContext();
   return data;
 };
 
@@ -166,6 +149,7 @@ window.signOutApp = async function signOutApp() {
   const { error } = await window.sb.auth.signOut();
   if (error) throw error;
 
+  await window.refreshAuthContext();
 };
 
 window.testSupabaseConnection = async function testSupabaseConnection() {
@@ -173,4 +157,117 @@ window.testSupabaseConnection = async function testSupabaseConnection() {
   console.log("SUPABASE TEST RESULT:", result);
   console.log("APP AUTH:", window.appAuth);
   return result;
+};
+
+window.fetchCompanyUsers = async function fetchCompanyUsers() {
+  if (!window.sb) return { ok: false, reason: "missing_client" };
+  const companyId = window.appAuth?.companyId || null;
+  if (!companyId) return { ok: false, reason: "missing_company" };
+
+  const { data: members, error: membersError } = await window.sb
+    .from("company_members")
+    .select("id, user_id, role, is_active, company_id")
+    .eq("company_id", companyId);
+
+  if (membersError) {
+    console.error("Błąd pobierania użytkowników firmy:", membersError);
+    return { ok: false, reason: "members_error", error: membersError };
+  }
+
+  const userIds = Array.from(new Set((members || []).map(m => m?.user_id).filter(Boolean)));
+  let profiles = [];
+
+  if (userIds.length) {
+    const { data: profileRows, error: profilesError } = await window.sb
+      .from("profiles")
+      .select("id, email, full_name, is_active")
+      .in("id", userIds);
+
+    if (profilesError) {
+      console.error("Błąd pobierania profili firmy:", profilesError);
+      return { ok: false, reason: "profiles_error", error: profilesError };
+    }
+
+    profiles = Array.isArray(profileRows) ? profileRows : [];
+  }
+
+  const profilesById = new Map(profiles.map(profile => [profile.id, profile]));
+  const users = (members || [])
+    .map(member => {
+      const profile = profilesById.get(member.user_id) || null;
+      return {
+        membershipId: member.id,
+        userId: member.user_id,
+        companyId: member.company_id,
+        role: member.role,
+        isActive: !!member.is_active,
+        email: profile?.email || "",
+        fullName: profile?.full_name || "",
+        profileIsActive: profile?.is_active ?? null
+      };
+    })
+    .sort((a, b) => {
+      const roleOrder = { owner: 0, admin: 1, worker: 2 };
+      const roleDiff = (roleOrder[a.role] ?? 9) - (roleOrder[b.role] ?? 9);
+      if (roleDiff !== 0) return roleDiff;
+      return String(a.email || a.fullName || a.userId).localeCompare(String(b.email || b.fullName || b.userId), "pl");
+    });
+
+  window.appAuth.companyUsers = users;
+  return { ok: true, users };
+};
+
+window.updateCompanyMemberAccess = async function updateCompanyMemberAccess(membershipId, patch = {}) {
+  if (!window.sb) return { ok: false, reason: "missing_client" };
+  const companyId = window.appAuth?.companyId || null;
+  if (!companyId) return { ok: false, reason: "missing_company" };
+
+  const payload = {};
+  if (typeof patch.role === "string" && patch.role.trim()) payload.role = patch.role.trim();
+  if (typeof patch.is_active === "boolean") payload.is_active = patch.is_active;
+
+  if (!Object.keys(payload).length) {
+    return { ok: false, reason: "empty_patch" };
+  }
+
+  const { data, error } = await window.sb
+    .from("company_members")
+    .update(payload)
+    .eq("id", membershipId)
+    .eq("company_id", companyId)
+    .select("id, user_id, role, is_active, company_id")
+    .maybeSingle();
+
+  if (error) {
+    console.error("Błąd aktualizacji company_members:", error);
+    return { ok: false, reason: "update_error", error };
+  }
+
+  return { ok: true, membership: data || null };
+};
+
+window.inviteCompanyWorker = async function inviteCompanyWorker(email, role = "worker") {
+  if (!window.sb) return { ok: false, reason: "missing_client" };
+
+  const cleanEmail = String(email || "").trim().toLowerCase();
+  const cleanRole = String(role || "worker").trim().toLowerCase() || "worker";
+  const companyId = window.appAuth?.companyId || null;
+
+  if (!cleanEmail) return { ok: false, reason: "missing_email" };
+  if (!companyId) return { ok: false, reason: "missing_company" };
+
+  const { data, error } = await window.sb.functions.invoke("invite-company-user", {
+    body: {
+      email: cleanEmail,
+      role: cleanRole,
+      company_id: companyId
+    }
+  });
+
+  if (error) {
+    console.error("Błąd invite-company-user:", error);
+    return { ok: false, reason: "function_error", error };
+  }
+
+  return { ok: true, data };
 };

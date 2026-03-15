@@ -21,6 +21,7 @@ window.APP_SUPABASE_CONFIG = {
       profile: null,
       membership: null,
       companyId: null,
+      companyName: null,
       companyRole: null
     };
     return;
@@ -48,6 +49,7 @@ window.APP_SUPABASE_CONFIG = {
     profile: null,
     membership: null,
     companyId: null,
+    companyName: null,
     companyRole: null
   };
 })();
@@ -87,6 +89,7 @@ window.refreshAuthContext = async function refreshAuthContext(sessionOverride) {
     window.appAuth.profile = null;
     window.appAuth.membership = null;
     window.appAuth.companyId = null;
+    window.appAuth.companyName = null;
     window.appAuth.companyRole = null;
 
     if (!user) {
@@ -128,9 +131,25 @@ window.refreshAuthContext = async function refreshAuthContext(sessionOverride) {
       };
     }
 
+    let company = null;
+    if (membership?.company_id) {
+      const { data: companyData, error: companyError } = await window.sb
+        .from("companies")
+        .select("id, name")
+        .eq("id", membership.company_id)
+        .maybeSingle();
+
+      if (companyError) {
+        console.error("Błąd pobierania companies:", companyError);
+      } else {
+        company = companyData || null;
+      }
+    }
+
     window.appAuth.profile = profile || null;
     window.appAuth.membership = membership || null;
     window.appAuth.companyId = membership?.company_id || null;
+    window.appAuth.companyName = company?.name || null;
     window.appAuth.companyRole = membership?.role || null;
 
     return {
@@ -138,7 +157,8 @@ window.refreshAuthContext = async function refreshAuthContext(sessionOverride) {
       loggedIn: true,
       user,
       profile,
-      membership
+      membership,
+      company
     };
   })();
 

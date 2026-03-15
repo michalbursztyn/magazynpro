@@ -2666,3 +2666,135 @@ body.part-details-open {
     grid-template-columns: 1fr;
   }
 }
+
+
+.side-panel-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-bottom: var(--space-3);
+  margin-bottom: var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+
+.side-auth-summary {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.side-auth-kicker {
+  font-size: var(--text-xs);
+  color: var(--success-light);
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  font-weight: var(--font-semibold);
+}
+
+.side-auth-company {
+  font-size: var(--text-base);
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.side-auth-settings-btn {
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background var(--trans-base), border-color var(--trans-base), color var(--trans-base), transform var(--trans-base);
+}
+
+.side-auth-settings-btn:hover {
+  background: var(--surface-3);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.side-auth-settings-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.account-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+  background: rgba(5, 8, 15, 0.72);
+  backdrop-filter: blur(10px);
+  display: grid;
+  place-items: center;
+  padding: var(--space-5);
+}
+
+.account-modal-shell {
+  width: min(100%, 560px);
+}
+
+.account-modal-panel {
+  position: relative;
+  background: var(--modal-panel-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+  padding: var(--space-5);
+}
+
+.account-modal-close {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.account-modal-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.account-modal-card {
+  display: grid;
+  gap: 4px;
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+}
+
+.account-modal-label {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--text-tertiary);
+}
+
+.account-modal-card strong {
+  color: var(--text);
+  word-break: break-word;
+}
+
+.account-modal-section {
+  margin-top: var(--space-4);
+}
+
+@media (max-width: 640px) {
+  .account-modal-grid {
+    grid-template-columns: 1fr;
+  }
+}

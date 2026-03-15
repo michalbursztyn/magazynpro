@@ -38,17 +38,6 @@
             Zużycie: <strong>FIFO</strong>.
           </p>
         </div>
-        <div class="auth-userbar" id="authUserBar">
-          <div class="auth-userbar-meta">
-            <span class="auth-userbar-kicker">Zalogowano</span>
-            <strong id="authUserDisplay">—</strong>
-            <span id="authCompanyDisplay">—</span>
-          </div>
-          <div class="auth-userbar-actions">
-            <span class="badge" id="authRoleBadge">—</span>
-            <button type="button" class="btn btn-secondary btn-sm" id="authLogoutBtn">Wyloguj</button>
-          </div>
-        </div>
       </header>
 
       <section class="tabPanel widePanel" data-tab-panel="parts">
@@ -294,7 +283,18 @@
 
     <aside class="globalSide" aria-label="Panel boczny">
       <div class="card stickySide">
-        <div class="cardHeader" style="padding-bottom:var(--space-3);margin-bottom:var(--space-3)"><h2 style="font-size:var(--text-lg)">Panel</h2></div>
+        <div class="side-panel-topbar">
+          <div class="side-auth-summary" aria-live="polite">
+            <span class="side-auth-kicker" id="authPanelStatusText">—</span>
+            <strong class="side-auth-company" id="authPanelCompanyName">—</strong>
+          </div>
+          <button type="button" class="side-auth-settings-btn" id="accountSettingsBtn" aria-label="Ustawienia konta" title="Ustawienia konta">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 .99-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 .99 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51.99H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51.99z"></path>
+            </svg>
+          </button>
+        </div>
         <div class="side-section" style="padding-top:0">
           <h3 class="side-title">Nawigacja</h3>
           <nav class="tabs-nav" aria-label="Nawigacja główna">
@@ -323,6 +323,53 @@
       </div>
     </aside>
   </main>
+
+  <div class="account-modal-backdrop hidden" id="accountSettingsBackdrop" aria-hidden="true">
+    <div class="account-modal-shell">
+      <div class="account-modal-panel hidden" id="accountSettingsPanel" role="dialog" aria-modal="true" aria-labelledby="accountSettingsTitle">
+        <button type="button" class="account-modal-close" id="accountSettingsCloseBtn" aria-label="Zamknij">×</button>
+        <div class="editor-header" style="margin-bottom:var(--space-4)">
+          <div>
+            <h4 class="editor-title" id="accountSettingsTitle">Konto</h4>
+            <span class="editor-hint">Podstawowe informacje o zalogowanym użytkowniku.</span>
+          </div>
+        </div>
+        <div class="account-modal-grid">
+          <div class="account-modal-card">
+            <span class="account-modal-label">Nazwa</span>
+            <strong id="accountUserDisplay">—</strong>
+          </div>
+          <div class="account-modal-card">
+            <span class="account-modal-label">E-mail</span>
+            <strong id="accountEmailDisplay">—</strong>
+          </div>
+          <div class="account-modal-card">
+            <span class="account-modal-label">Firma</span>
+            <strong id="accountCompanyDisplay">—</strong>
+          </div>
+          <div class="account-modal-card">
+            <span class="account-modal-label">Rola</span>
+            <strong id="accountRoleDisplay">—</strong>
+          </div>
+        </div>
+        <div class="account-modal-section">
+          <div class="editor-header" style="margin-bottom:var(--space-3)">
+            <div>
+              <h5 class="editor-title">Hasło</h5>
+              <span class="editor-hint">Zmiana hasła będzie dodana w następnym kroku.</span>
+            </div>
+          </div>
+          <div class="account-modal-card">
+            <span class="account-modal-label">Aktualne ustawienie</span>
+            <strong id="accountPasswordDisplay">••••••••</strong>
+          </div>
+        </div>
+        <div class="users-admin-actions" style="margin-top:var(--space-4)">
+          <button type="button" class="btn btn-secondary" id="authLogoutBtn">Wyloguj</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <div class="tab-modal-backdrop hidden" id="tabModalBackdrop" aria-hidden="true">
     <div class="tab-modal-shell"><button type="button" class="tab-modal-close" id="tabModalCloseBtn" aria-label="Zamknij">×</button></div>

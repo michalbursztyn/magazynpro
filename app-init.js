@@ -708,9 +708,17 @@ function getAuthElements() {
     loginBtn: document.getElementById("authLoginBtn"),
     errorBox: document.getElementById("authErrorBox"),
     logoutBtn: document.getElementById("authLogoutBtn"),
-    userDisplay: document.getElementById("authUserDisplay"),
-    companyDisplay: document.getElementById("authCompanyDisplay"),
-    roleBadge: document.getElementById("authRoleBadge")
+    panelStatusText: document.getElementById("authPanelStatusText"),
+    panelCompanyName: document.getElementById("authPanelCompanyName"),
+    settingsBtn: document.getElementById("accountSettingsBtn"),
+    settingsBackdrop: document.getElementById("accountSettingsBackdrop"),
+    settingsPanel: document.getElementById("accountSettingsPanel"),
+    settingsCloseBtn: document.getElementById("accountSettingsCloseBtn"),
+    accountUserDisplay: document.getElementById("accountUserDisplay"),
+    accountEmailDisplay: document.getElementById("accountEmailDisplay"),
+    accountCompanyDisplay: document.getElementById("accountCompanyDisplay"),
+    accountRoleDisplay: document.getElementById("accountRoleDisplay"),
+    accountPasswordDisplay: document.getElementById("accountPasswordDisplay")
   };
 }
 
@@ -741,30 +749,49 @@ function setAuthError(message) {
 }
 
 function updateAuthUI() {
-  const { userDisplay, companyDisplay, roleBadge } = getAuthElements();
+  const {
+    panelStatusText,
+    panelCompanyName,
+    accountUserDisplay,
+    accountEmailDisplay,
+    accountCompanyDisplay,
+    accountRoleDisplay,
+    accountPasswordDisplay,
+    settingsBackdrop,
+    settingsPanel
+  } = getAuthElements();
   const loggedIn = !!window.appAuth?.session;
 
   setAuthLocked(!loggedIn);
 
   if (!loggedIn) {
-    if (userDisplay) userDisplay.textContent = "—";
-    if (companyDisplay) companyDisplay.textContent = "—";
-    if (roleBadge) roleBadge.textContent = "—";
+    if (panelStatusText) panelStatusText.textContent = "—";
+    if (panelCompanyName) panelCompanyName.textContent = "—";
+    if (accountUserDisplay) accountUserDisplay.textContent = "—";
+    if (accountEmailDisplay) accountEmailDisplay.textContent = "—";
+    if (accountCompanyDisplay) accountCompanyDisplay.textContent = "—";
+    if (accountRoleDisplay) accountRoleDisplay.textContent = "—";
+    if (accountPasswordDisplay) accountPasswordDisplay.textContent = "••••••••";
+    if (settingsBackdrop) {
+      settingsBackdrop.classList.add("hidden");
+      settingsBackdrop.setAttribute("aria-hidden", "true");
+    }
+    settingsPanel?.classList.add("hidden");
     return;
   }
 
   const displayName = window.appAuth?.profile?.full_name || window.appAuth?.profile?.email || window.appAuth?.user?.email || "—";
-  const email = window.appAuth?.profile?.email || window.appAuth?.user?.email || "";
+  const email = window.appAuth?.profile?.email || window.appAuth?.user?.email || "—";
   const role = window.appAuth?.companyRole || window.appAuth?.membership?.role || "—";
-  const companyId = window.appAuth?.companyId || null;
+  const companyName = window.appAuth?.companyName || window.appAuth?.companyId || "—";
 
-  if (userDisplay) userDisplay.textContent = displayName;
-  if (companyDisplay) {
-    companyDisplay.textContent = companyId
-      ? `${email ? `${email} • ` : ""}Firma: ${companyId}`
-      : (email || "—");
-  }
-  if (roleBadge) roleBadge.textContent = String(role).toUpperCase();
+  if (panelStatusText) panelStatusText.textContent = "ZALOGOWANO";
+  if (panelCompanyName) panelCompanyName.textContent = companyName;
+  if (accountUserDisplay) accountUserDisplay.textContent = displayName;
+  if (accountEmailDisplay) accountEmailDisplay.textContent = email;
+  if (accountCompanyDisplay) accountCompanyDisplay.textContent = companyName;
+  if (accountRoleDisplay) accountRoleDisplay.textContent = String(role).toUpperCase();
+  if (accountPasswordDisplay) accountPasswordDisplay.textContent = "••••••••";
   setAuthError("");
   if (loggedIn) applyRoleAccess();
 }
@@ -804,7 +831,32 @@ function bindAuthUI() {
   if (window.__authUIBound) return;
   window.__authUIBound = true;
 
-  const { loginForm, emailInput, passwordInput, loginBtn, logoutBtn } = getAuthElements();
+  const {
+    loginForm,
+    emailInput,
+    passwordInput,
+    loginBtn,
+    logoutBtn,
+    settingsBtn,
+    settingsBackdrop,
+    settingsPanel,
+    settingsCloseBtn
+  } = getAuthElements();
+
+  const openAccountSettings = () => {
+    if (!window.appAuth?.session || !settingsBackdrop || !settingsPanel) return;
+    settingsBackdrop.classList.remove("hidden");
+    settingsBackdrop.setAttribute("aria-hidden", "false");
+    settingsPanel.classList.remove("hidden");
+    document.body.classList.add("account-settings-open");
+  };
+
+  const closeAccountSettings = () => {
+    settingsBackdrop?.classList.add("hidden");
+    settingsBackdrop?.setAttribute("aria-hidden", "true");
+    settingsPanel?.classList.add("hidden");
+    document.body.classList.remove("account-settings-open");
+  };
 
   loginForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -838,10 +890,27 @@ function bindAuthUI() {
     }
   });
 
+  settingsBtn?.addEventListener("click", () => {
+    openAccountSettings();
+  });
+
+  settingsCloseBtn?.addEventListener("click", () => {
+    closeAccountSettings();
+  });
+
+  settingsBackdrop?.addEventListener("click", (e) => {
+    if (e.target === settingsBackdrop) closeAccountSettings();
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeAccountSettings();
+  });
+
   logoutBtn?.addEventListener("click", async () => {
     try {
       await window.signOutApp();
       window.__appInitialized = false;
+      closeAccountSettings();
       setAuthError("");
       updateAuthUI();
       passwordInput && (passwordInput.value = "");
@@ -879,6 +948,7 @@ function bindAuthUI() {
 
       if (!hasSession) {
         window.__appInitialized = false;
+        closeAccountSettings();
         passwordInput && (passwordInput.value = "");
       }
     })().catch((err) => {

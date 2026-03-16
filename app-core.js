@@ -1055,6 +1055,28 @@ function getSupplierDataWarnings(supplierNameRaw) {
   };
 }
 
+function getMachineBomPartsForStatus(machineCodeRaw) {
+  const machineCode = normalize(machineCodeRaw);
+  const machine = (state.machineCatalog || []).find(item => normalize(item?.code) === machineCode);
+  if (!machine || !Array.isArray(machine.bom)) return [];
+
+  return machine.bom
+    .map(item => ({
+      sku: normalize(item?.sku),
+      qty: safeInt(item?.qty)
+    }))
+    .filter(item => item.sku);
+}
+
+function getMachineDataWarnings(machineCodeRaw) {
+  const bomParts = getMachineBomPartsForStatus(machineCodeRaw);
+
+  return {
+    bomParts,
+    hasMissingParts: bomParts.length === 0
+  };
+}
+
 
 function getPendingStockAdjustmentsCount() {
   ensureUiState();

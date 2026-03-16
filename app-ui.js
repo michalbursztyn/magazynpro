@@ -1261,19 +1261,31 @@ function refreshCatalogsUI() {
   }).join("");
 
   // Machines catalog
-  els.machinesCatalog.innerHTML = state.machineCatalog.map(m => `
-    <tr>
-      <td><span class="badge">${escapeHtml(m.code)}</span></td>
-      <td>${escapeHtml(m.name)}</td>
-      <td class="text-right">${m.bom.length}</td>
-      <td class="text-right">
-        <button class="btn btn-success btn-sm" onclick="openMachineEditor('${escapeHtml(m.code)}')">Edytuj BOM</button>
-        <button class="btn btn-danger btn-sm btn-icon" onclick="askDeleteMachine('${escapeHtml(m.code)}')" aria-label="Usuń">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
-      </td>
-    </tr>
-  `).join("");
+  els.machinesCatalog.innerHTML = state.machineCatalog.map(m => {
+    const warnings = getMachineDataWarnings(m.code);
+    const badges = [];
+
+    if (warnings.hasMissingParts) {
+      badges.push('<span class="badge badge-warning badge-status-warning">BRAK CZĘŚCI</span>');
+    }
+
+    return `
+      <tr>
+        <td><span class="badge">${escapeHtml(m.code)}</span></td>
+        <td>${escapeHtml(m.name)}</td>
+        <td class="text-right">${Array.isArray(m.bom) ? m.bom.length : 0}</td>
+        <td>
+          ${badges.length ? `<div class="catalog-status-badges">${badges.join('')}</div>` : '<span class="catalog-status-empty" aria-hidden="true"></span>'}
+        </td>
+        <td class="text-right">
+          <button class="btn btn-success btn-sm" onclick="openMachineEditor('${escapeHtml(m.code)}')">Edytuj BOM</button>
+          <button class="btn btn-danger btn-sm btn-icon" onclick="askDeleteMachine('${escapeHtml(m.code)}')" aria-label="Usuń">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join("");
 
   // Machine select
   renderSelectOptions(els.machineSelect, state.machineCatalog.map(m => m.code), c => {

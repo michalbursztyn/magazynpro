@@ -145,6 +145,28 @@ function initThresholdsToggle() {
   });
 }
 
+
+function initWarehouseArchiveToggles() {
+  const partsToggle = document.getElementById("showArchivedPartsToggle");
+  const machinesToggle = document.getElementById("showArchivedMachinesToggle");
+
+  if (partsToggle) {
+    partsToggle.checked = shouldShowArchivedPartsInWarehouse();
+    partsToggle.addEventListener("change", (e) => {
+      setShowArchivedPartsInWarehouse(!!e.target.checked);
+      renderWarehouse();
+    });
+  }
+
+  if (machinesToggle) {
+    machinesToggle.checked = shouldShowArchivedMachinesInStock();
+    machinesToggle.addEventListener("change", (e) => {
+      setShowArchivedMachinesInStock(!!e.target.checked);
+      renderMachinesStock();
+    });
+  }
+}
+
 let partEditorIsNew = true;
 
 function syncPartEditorModal() {
@@ -1034,6 +1056,7 @@ async function init() {
   initThresholdsToggle();
   initNewPartToggle();
   initStockEditMode();
+  initWarehouseArchiveToggles();
   
   if (!document.querySelector(".toast-host")) {
     const h = document.createElement("div");

@@ -45,6 +45,10 @@
           <div class="cardHeader">
             <h2>Magazyn Części</h2>
             <div class="toolbar warehouse-header-actions" style="margin:0">
+              <label class="archive-toggle" for="showArchivedPartsToggle">
+                <input type="checkbox" id="showArchivedPartsToggle" checked />
+                <span>Pokaż zarchiwizowane</span>
+              </label>
               <button type="button" class="btn btn-secondary btn-sm" id="toggleThresholdsBtn">Progi</button>
               <button type="button" class="btn btn-secondary btn-sm" id="stockEditToggleBtn">Edycja stanów</button>
               <div class="warehouse-edit-actions hidden" id="stockEditActions">
@@ -151,7 +155,7 @@
 
       <section class="tabPanel hidden" data-tab-panel="machines">
         <div class="card">
-          <div class="cardHeader"><div><h2>Magazyn Wyrobów Gotowych</h2><p class="text-secondary">Stan magazynowy maszyn</p></div></div>
+          <div class="cardHeader"><div><h2>Magazyn Wyrobów Gotowych</h2><p class="text-secondary">Stan magazynowy maszyn</p></div><label class="archive-toggle" for="showArchivedMachinesToggle"><input type="checkbox" id="showArchivedMachinesToggle" checked /><span>Pokaż zarchiwizowane</span></label></div>
           <div class="toolbar"><input type="text" id="searchMachines" placeholder="Szukaj..." autocomplete="off" /></div>
           <div class="table-container">
             <table id="machinesStockTable"><thead><tr><th>Nazwa Maszyny (ID)</th><th>Typ</th><th class="text-right">Stan</th><th>Status</th></tr></thead><tbody></tbody></table>

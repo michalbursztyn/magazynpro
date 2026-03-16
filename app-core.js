@@ -75,6 +75,8 @@ function ensureUiState() {
   if (!state.ui || typeof state.ui !== "object") state.ui = {};
   if (typeof state.ui.stockEditMode !== "boolean") state.ui.stockEditMode = false;
   if (!state.ui.pendingStockAdjustments || typeof state.ui.pendingStockAdjustments !== "object") state.ui.pendingStockAdjustments = {};
+  if (typeof state.ui.showArchivedPartsInWarehouse !== "boolean") state.ui.showArchivedPartsInWarehouse = true;
+  if (typeof state.ui.showArchivedMachinesInStock !== "boolean") state.ui.showArchivedMachinesInStock = true;
 }
 
 function serializeState() {
@@ -225,6 +227,8 @@ function restoreState(data) {
 
   state.ui.stockEditMode = false;
   state.ui.pendingStockAdjustments = {};
+  state.ui.showArchivedPartsInWarehouse = true;
+  state.ui.showArchivedMachinesInStock = true;
 
   clearArchivedItemsFromDrafts();
   syncIdCounter();
@@ -1080,8 +1084,31 @@ function getTodayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function getPartTotalQty(skuRaw) {
+function shouldShowArchivedPartsInWarehouse() {
+  ensureUiState();
+  return state.ui.showArchivedPartsInWarehouse !== false;
+}
+
+function shouldShowArchivedMachinesInStock() {
+  ensureUiState();
+  return state.ui.showArchivedMachinesInStock !== false;
+}
+
+function setShowArchivedPartsInWarehouse(shouldShow) {
+  ensureUiState();
+  state.ui.showArchivedPartsInWarehouse = shouldShow !== false;
+}
+
+function setShowArchivedMachinesInStock(shouldShow) {
+  ensureUiState();
+  state.ui.showArchivedMachinesInStock = shouldShow !== false;
+}
+
+function getPartTotalQty(skuRaw, options = {}) {
   const k = skuKey(skuRaw);
+  const includeArchivedPart = options.includeArchivedPart !== false;
+  if (!includeArchivedPart && isPartArchived(skuRaw)) return 0;
+
   return (state.lots || [])
     .filter(l => skuKey(l.sku) === k)
     .reduce((sum, l) => sum + safeQtyInt(l.qty), 0);

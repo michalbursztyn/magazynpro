@@ -91,11 +91,13 @@ function toast(title, message = '', type = 'success', opts = {}) {
 // Part details modal state
 let currentPartDetailsSku = null;
 
-function computePartsSummary() {
+function computePartsSummary(options = {}) {
+  const includeArchived = options.includeArchived !== false;
   const summary = new Map();
 
   for (const [key, part] of (state.partsCatalog || new Map()).entries()) {
     if (!key || !part) continue;
+    if (!includeArchived && part?.archived) continue;
     summary.set(key, {
       sku: part.sku,
       name: part.name,
@@ -106,6 +108,9 @@ function computePartsSummary() {
 
   (state.lots || []).forEach(lot => {
     const key = skuKey(lot.sku);
+    const catalogPart = state.partsCatalog.get(key);
+    if (!includeArchived && catalogPart?.archived) return;
+
     const prev = summary.get(key) || { sku: lot.sku, name: lot.name, qty: 0, value: 0 };
     prev.qty += safeQtyInt(lot.qty);
     prev.value += safeQtyInt(lot.qty) * safeFloat(lot.unitPrice || 0);
@@ -119,7 +124,7 @@ function renderSideMissingTop5() {
   const els = getEls();
   if (!els.sideMissingSignals) return;
 
-  const rows = computePartsSummary()
+  const rows = computePartsSummary({ includeArchived: shouldShowArchivedPartsInWarehouse() })
     .map(r => ({ ...r, statusMeta: getPartStockStatus(r.sku, r.qty) }))
     .filter(r => r.statusMeta.level === "warning" || r.statusMeta.level === "danger")
     .sort((a, b) => {
@@ -451,10 +456,14 @@ function renderWarehouse() {
   const stockEditToggleBtn = document.getElementById("stockEditToggleBtn");
   const stockEditActions = document.getElementById("stockEditActions");
   const stockEditBanner = document.getElementById("stockEditBanner");
+  const showArchivedToggle = document.getElementById("showArchivedPartsToggle");
   const isEditMode = !!state.ui?.stockEditMode;
   const pendingMap = state.ui?.pendingStockAdjustments || {};
-  
-  const summaryRows = computePartsSummary().filter(item => {
+  const showArchived = shouldShowArchivedPartsInWarehouse();
+
+  if (showArchivedToggle) showArchivedToggle.checked = showArchived;
+
+  const summaryRows = computePartsSummary({ includeArchived: showArchived }).filter(item => {
     if (!q) return true;
     return String(item?.sku || '').toLowerCase().includes(q) || String(item?.name || '').toLowerCase().includes(q);
   });
@@ -471,7 +480,10 @@ function renderWarehouse() {
   if (stockEditBanner) {
     if (isEditMode) {
       stockEditBanner.classList.remove("hidden");
-      const changedCount = getPendingStockAdjustmentsCount();
+      const visibleSkuSet = new Set(summaryRows.map(item => skuKey(item.sku)));
+      const changedCount = Object.entries(pendingMap).filter(([pendingSku, item]) => {
+        return visibleSkuSet.has(pendingSku) && item && item.invalid !== true && safeQtyInt(item.newQty) !== safeQtyInt(item.previousQty);
+      }).length;
       stockEditBanner.innerHTML = `
         <div>
           <strong>Tryb korekty stanów aktywny</strong>
@@ -705,11 +717,16 @@ function renderManualConsume() {
 function renderMachinesStock() {
   const searchInput = document.getElementById("searchMachines");
   const q = normalize(searchInput?.value).toLowerCase();
-  
+  const showArchivedToggle = document.getElementById("showArchivedMachinesToggle");
+  const showArchived = shouldShowArchivedMachinesInStock();
+
+  if (showArchivedToggle) showArchivedToggle.checked = showArchived;
+
   const tbody = document.querySelector("#machinesStockTable tbody");
   if (!tbody) return;
 
   tbody.innerHTML = state.machinesStock
+    .filter(m => showArchived || !isMachineArchived(m?.code))
     .filter(m => !q || m.name.toLowerCase().includes(q) || m.code.toLowerCase().includes(q))
     .map(m => {
       const isArchived = isMachineArchived(m?.code);

@@ -1028,60 +1028,30 @@ function getPartDataWarnings(skuRaw) {
   };
 }
 
+
 function getSupplierPartsForStatus(supplierNameRaw) {
   const supplierName = normalize(supplierNameRaw);
-  if (!supplierName) return [];
-
   const supplier = state.suppliers.get(supplierName);
-  const prices = supplier?.prices instanceof Map ? supplier.prices : null;
-  if (!prices || !prices.size) return [];
+  if (!supplier || !(supplier.prices instanceof Map)) return [];
 
-  return Array.from(prices.keys())
-    .filter(k => state.partsCatalog.has(k))
-    .map(k => {
-      const part = state.partsCatalog.get(k);
+  return Array.from(supplier.prices.entries())
+    .filter(([partKey]) => state.partsCatalog.has(partKey))
+    .map(([partKey, price]) => {
+      const part = state.partsCatalog.get(partKey);
       return {
-        sku: part?.sku || k,
-        name: part?.name || ''
+        sku: part?.sku || partKey,
+        name: part?.name || '',
+        price: safeFloat(price ?? 0)
       };
     });
 }
 
 function getSupplierDataWarnings(supplierNameRaw) {
   const parts = getSupplierPartsForStatus(supplierNameRaw);
+
   return {
     parts,
     hasMissingParts: parts.length === 0
-  };
-}
-
-function getMachineBomPartsForStatus(machineCodeRaw) {
-  const machineCode = normalize(machineCodeRaw);
-  if (!machineCode) return [];
-
-  const machine = (state.machineCatalog || []).find(m => normalize(m?.code) === machineCode);
-  const bom = Array.isArray(machine?.bom) ? machine.bom : [];
-
-  return bom
-    .map(item => {
-      const key = skuKey(item?.sku);
-      const part = state.partsCatalog.get(key);
-      const qty = safeQtyInt(item?.qty);
-      if (!key || qty <= 0) return null;
-      return {
-        sku: part?.sku || normalize(item?.sku),
-        name: part?.name || normalize(item?.name),
-        qty
-      };
-    })
-    .filter(Boolean);
-}
-
-function getMachineDataWarnings(machineCodeRaw) {
-  const bomParts = getMachineBomPartsForStatus(machineCodeRaw);
-  return {
-    bomParts,
-    hasMissingParts: bomParts.length === 0
   };
 }
 

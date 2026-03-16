@@ -175,12 +175,17 @@
 
       <section class="tabPanel hidden" data-tab-panel="catalog_suppliers">
         <div class="card">
-          <div class="cardHeader"><div><h2>Dostawcy i Cenniki</h2><p class="text-secondary">Zarządzaj dostawcami</p></div></div>
-          <div>
-            <div class="form-row" style="align-items:flex-end">
-              <label>Nazwa dostawcy<input type="text" id="supplierNameInput" placeholder="np. Hurtownia X" autocomplete="off" /></label>
-              <button type="button" class="btn btn-primary" id="addSupplierBtn" style="height:42px">Dodaj</button>
+          <div class="cardHeader supplier-catalog-header">
+            <div>
+              <h2>Dostawcy i Cenniki</h2>
+              <p class="text-secondary">Zarządzaj dostawcami</p>
             </div>
+            <div class="supplier-add-row">
+              <input type="text" id="supplierNameInput" class="supplier-add-input" placeholder="np. Hurtownia X" autocomplete="off" />
+              <button type="button" class="btn btn-primary btn-sm supplier-add-btn" id="addSupplierBtn">Dodaj</button>
+            </div>
+          </div>
+          <div>
             <div class="toolbar"><input type="text" id="searchCatalogSuppliers" placeholder="Szukaj po nazwie dostawcy..." autocomplete="off" /></div>
             <div class="table-container">
               <table id="suppliersListTable"><thead><tr><th>Dostawca</th><th>Status</th><th class="text-right">Akcje</th></tr></thead><tbody></tbody></table>

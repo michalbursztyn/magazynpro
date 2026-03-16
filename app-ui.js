@@ -454,7 +454,7 @@ function renderWarehouse() {
   const isEditMode = !!state.ui?.stockEditMode;
   const pendingMap = state.ui?.pendingStockAdjustments || {};
   
-  const summaryRows = computePartsSummary().filter(item => !isPartArchived(item?.sku)).filter(item => {
+  const summaryRows = computePartsSummary().filter(item => {
     if (!q) return true;
     return String(item?.sku || '').toLowerCase().includes(q) || String(item?.name || '').toLowerCase().includes(q);
   });
@@ -493,9 +493,10 @@ function renderWarehouse() {
       const isInvalid = !!pending?.invalid;
       const diff = isInvalid ? null : Number.isFinite(pending?.diff) ? pending.diff : 0;
       const effectiveQty = isInvalid ? item.qty : Number.isFinite(pending?.newQty) ? safeQtyInt(pending.newQty) : item.qty;
+      const isArchived = isPartArchived(item.sku);
       const statusMeta = getPartStockStatus(item.sku, effectiveQty);
       const rowClass = [
-        statusMeta.level === "danger" ? "stock-row-danger" : statusMeta.level === "warning" ? "stock-row-warning" : "",
+        !isArchived && statusMeta.level === "danger" ? "stock-row-danger" : !isArchived && statusMeta.level === "warning" ? "stock-row-warning" : "",
         pending && !isInvalid && diff !== 0 ? "stock-edit-row-changed" : "",
         isInvalid ? "stock-edit-row-invalid" : ""
       ].filter(Boolean).join(" ");
@@ -530,6 +531,7 @@ function renderWarehouse() {
           <td>${escapeHtml(item.name || "")}</td>
           <td class="text-right stock-edit-cell">${stockCell}</td>
           <td class="text-right">${fmtPLN.format(item.value)}</td>
+          <td>${isArchived ? '<span class="badge badge-muted badge-status-warning">ZARCHIWIZOWANE</span>' : '<span class="catalog-status-empty" aria-hidden="true"></span>'}</td>
           <td class="text-right">
             <button class="btn btn-secondary btn-sm" type="button"
               data-action="openPartDetails"
@@ -708,9 +710,10 @@ function renderMachinesStock() {
   if (!tbody) return;
 
   tbody.innerHTML = state.machinesStock
-    .filter(m => !isMachineArchived(m?.code))
     .filter(m => !q || m.name.toLowerCase().includes(q) || m.code.toLowerCase().includes(q))
-    .map(m => `<tr>
+    .map(m => {
+      const isArchived = isMachineArchived(m?.code);
+      return `<tr>
       <td>
         <div style="display:flex;gap:var(--space-2);align-items:center">
           <span class="badge">${escapeHtml(m.code)}</span>
@@ -718,7 +721,9 @@ function renderMachinesStock() {
       </td>
       <td>${escapeHtml(m.name)}</td>
       <td class="text-right"><strong>${m.qty}</strong></td>
-    </tr>`).join("");
+      <td>${isArchived ? '<span class="badge badge-muted badge-status-warning">ZARCHIWIZOWANE</span>' : '<span class="catalog-status-empty" aria-hidden="true"></span>'}</td>
+    </tr>`;
+    }).join("");
 }
 
 function getHistoryView() {
@@ -1619,6 +1624,17 @@ function closeMachineCatalogDetailsModal() {
   document.body.classList.remove('catalog-readonly-open');
 }
 
+function renderCatalogStatusBadges({ isArchived = false, warningBadges = [] } = {}) {
+  if (isArchived) {
+    return '<div class="catalog-status-badges"><span class="badge badge-muted badge-status-warning">ZARCHIWIZOWANE</span></div>';
+  }
+
+  const badges = Array.isArray(warningBadges) ? warningBadges.filter(Boolean) : [];
+  return badges.length
+    ? `<div class="catalog-status-badges">${badges.join('')}</div>`
+    : '<span class="catalog-status-empty" aria-hidden="true"></span>';
+}
+
 
 function renderAllSuppliers() {
   const table = byId("suppliersListTable");
@@ -1628,20 +1644,17 @@ function renderAllSuppliers() {
   tbody.innerHTML = Array.from(state.suppliers.keys()).sort().map(name => {
     const warnings = getSupplierDataWarnings(name);
     const isArchived = isSupplierArchived(name);
-    const badges = [];
+    const warningBadges = [];
 
-    if (isArchived) {
-      badges.push('<span class="badge badge-muted badge-status-warning">ZARCHIWIZOWANE</span>');
-    }
     if (warnings.hasMissingParts) {
-      badges.push('<span class="badge badge-warning badge-status-warning">BRAK CZĘŚCI</span>');
+      warningBadges.push('<span class="badge badge-warning badge-status-warning">BRAK CZĘŚCI</span>');
     }
 
     return `
       <tr>
         <td>${escapeHtml(name)}</td>
         <td>
-          ${badges.length ? `<div class="catalog-status-badges">${badges.join('')}</div>` : '<span class="catalog-status-empty" aria-hidden="true"></span>'}
+          ${renderCatalogStatusBadges({ isArchived, warningBadges })}
         </td>
         <td class="text-right">
           <div class="catalog-actions">
@@ -1670,16 +1683,13 @@ function refreshCatalogsUI() {
     const warnings = getPartDataWarnings(p.sku);
     const suppliers = warnings.suppliers.map(item => item.name);
     const isArchived = !!p?.archived;
-    const badges = [];
+    const warningBadges = [];
 
-    if (isArchived) {
-      badges.push('<span class="badge badge-muted badge-status-warning">ZARCHIWIZOWANE</span>');
-    }
     if (warnings.hasMissingPrice) {
-      badges.push('<span class="badge badge-warning badge-status-warning">BRAK CENY</span>');
+      warningBadges.push('<span class="badge badge-warning badge-status-warning">BRAK CENY</span>');
     }
     if (warnings.hasMissingSuppliers) {
-      badges.push('<span class="badge badge-warning badge-status-warning">BRAK DOSTAWCÓW</span>');
+      warningBadges.push('<span class="badge badge-warning badge-status-warning">BRAK DOSTAWCÓW</span>');
     }
 
     return `<tr>
@@ -1687,7 +1697,7 @@ function refreshCatalogsUI() {
       <td>${escapeHtml(p.name)}</td>
       <td>${suppliers.length ? suppliers.map(s => escapeHtml(s)).join(", ") : '<span class="text-muted">-</span>'}</td>
       <td>
-        ${badges.length ? `<div class="catalog-status-badges">${badges.join('')}</div>` : '<span class="catalog-status-empty" aria-hidden="true"></span>'}
+        ${renderCatalogStatusBadges({ isArchived, warningBadges })}
       </td>
       <td class="text-right">
         <div class="catalog-actions">
@@ -1703,13 +1713,10 @@ function refreshCatalogsUI() {
   els.machinesCatalog.innerHTML = state.machineCatalog.map(m => {
     const warnings = getMachineDataWarnings(m.code);
     const isArchived = !!m?.archived;
-    const badges = [];
+    const warningBadges = [];
 
-    if (isArchived) {
-      badges.push('<span class="badge badge-muted badge-status-warning">ZARCHIWIZOWANE</span>');
-    }
     if (warnings.hasMissingParts) {
-      badges.push('<span class="badge badge-warning badge-status-warning">BRAK CZĘŚCI</span>');
+      warningBadges.push('<span class="badge badge-warning badge-status-warning">BRAK CZĘŚCI</span>');
     }
 
     return `
@@ -1718,7 +1725,7 @@ function refreshCatalogsUI() {
         <td>${escapeHtml(m.name)}</td>
         <td class="text-right">${Array.isArray(m.bom) ? m.bom.length : 0}</td>
         <td>
-          ${badges.length ? `<div class="catalog-status-badges">${badges.join('')}</div>` : '<span class="catalog-status-empty" aria-hidden="true"></span>'}
+          ${renderCatalogStatusBadges({ isArchived, warningBadges })}
         </td>
         <td class="text-right">
           <div class="catalog-actions">

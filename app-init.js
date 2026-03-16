@@ -1673,7 +1673,11 @@ Rekord wróci do nowych operacji. Historia pozostanie bez zmian.`;
 window.openSupplierEditor = (name) => {
   editingSup = name;
   const originalSup = state.suppliers.get(name);
-  editingSupSnapshot = originalSup ? { name, prices: new Map(originalSup.prices || []) } : null;
+  editingSupSnapshot = originalSup ? {
+    name,
+    archived: !!originalSup?.archived,
+    prices: new Map(originalSup.prices || [])
+  } : null;
   const panel = document.getElementById("supplierEditorTemplate");
   const nameEl = document.getElementById("supplierEditorName");
   if (nameEl) nameEl.textContent = name;
@@ -1737,7 +1741,10 @@ document.getElementById("supplierEditorCancelBtn")?.addEventListener("click", ()
   }
 
   if (editingSup && editingSupSnapshot) {
-    state.suppliers.set(editingSup, { prices: new Map(editingSupSnapshot.prices || []) });
+    state.suppliers.set(editingSup, {
+      archived: !!editingSupSnapshot?.archived,
+      prices: new Map(editingSupSnapshot.prices || [])
+    });
     save();
   }
 

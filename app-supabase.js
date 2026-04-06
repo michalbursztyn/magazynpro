@@ -22,7 +22,8 @@ window.APP_SUPABASE_CONFIG = {
       membership: null,
       companyId: null,
       companyName: null,
-      companyRole: null
+      companyRole: null,
+      rolePermissions: {}
     };
     return;
   }
@@ -50,7 +51,8 @@ window.APP_SUPABASE_CONFIG = {
     membership: null,
     companyId: null,
     companyName: null,
-    companyRole: null
+    companyRole: null,
+    rolePermissions: {}
   };
 })();
 
@@ -91,6 +93,7 @@ window.refreshAuthContext = async function refreshAuthContext(sessionOverride) {
     window.appAuth.companyId = null;
     window.appAuth.companyName = null;
     window.appAuth.companyRole = null;
+    window.appAuth.rolePermissions = {};
 
     if (!user) {
       return {
@@ -204,6 +207,48 @@ window.updateOwnPassword = async function updateOwnPassword(newPassword) {
   return data;
 };
 
+window.fetchCompanyRolePermissions = async function fetchCompanyRolePermissions(companyIdOverride) {
+  if (!window.sb) throw new Error("Brak klienta Supabase.");
+
+  const companyId = companyIdOverride || window.appAuth?.companyId;
+  if (!companyId) throw new Error("Brak company_id w kontekście użytkownika.");
+
+  const { data, error } = await window.sb
+    .from("company_role_permissions")
+    .select("id, company_id, role, tab_permissions, created_at, updated_at")
+    .eq("company_id", companyId)
+    .order("role", { ascending: true });
+
+  if (error) throw error;
+  return Array.isArray(data) ? data : [];
+};
+
+window.upsertCompanyRolePermissions = async function upsertCompanyRolePermissions(role, tabPermissions = {}, companyIdOverride) {
+  if (!window.sb) throw new Error("Brak klienta Supabase.");
+
+  const companyId = companyIdOverride || window.appAuth?.companyId;
+  const normalizedRole = String(role || "").trim().toLowerCase();
+  if (!companyId) throw new Error("Brak company_id w kontekście użytkownika.");
+  if (!["admin", "worker"].includes(normalizedRole)) {
+    throw new Error("Na tym etapie można zapisywać konfigurację tylko dla ról admin i worker.");
+  }
+
+  const payload = {
+    company_id: companyId,
+    role: normalizedRole,
+    tab_permissions: { ...(tabPermissions || {}) }
+  };
+
+  const { data, error } = await window.sb
+    .from("company_role_permissions")
+    .upsert(payload, { onConflict: "company_id,role" })
+    .select("id, company_id, role, tab_permissions, created_at, updated_at")
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+};
+
 window.fetchCompanyUsers = async function fetchCompanyUsers(companyIdOverride) {
   if (!window.sb) throw new Error("Brak klienta Supabase.");
 
@@ -285,7 +330,7 @@ window.createCompanyWorker = async function createCompanyWorker(payload = {}) {
   if (!email) throw new Error("Podaj adres e-mail pracownika.");
   if (!password) throw new Error("Podaj hasło startowe.");
   if (password.length < 6) throw new Error("Hasło startowe musi mieć co najmniej 6 znaków.");
-  if (role !== "worker") throw new Error("Na tym etapie można tworzyć tylko konta worker.");
+  if (!["worker", "admin"].includes(role)) throw new Error("Na tym etapie można tworzyć tylko konta worker albo admin.");
 
   const functionName = String(window.APP_SUPABASE_CONFIG?.createWorkerFunctionName || "").trim();
   if (!functionName) {

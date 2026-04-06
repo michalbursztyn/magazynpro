@@ -412,16 +412,22 @@ function initNewPartToggle() {
 
 // === MAIN INIT ===
 
-const APP_TAB_ACCESS = {
-  parts: ["owner", "worker"],
-  delivery: ["owner", "worker"],
-  build: ["owner", "worker"],
-  machines: ["owner", "worker"],
-  catalog_parts: ["owner"],
-  catalog_suppliers: ["owner"],
-  catalog_machines: ["owner"],
-  history: ["owner"],
-  users: ["owner"]
+const APP_TABS = Object.freeze([
+  { id: "parts", label: "Magazyn Części", description: "Podgląd stanu, wartości i korekt części." },
+  { id: "delivery", label: "Dostawa", description: "Przyjęcie dostaw i dodawanie pozycji na magazyn." },
+  { id: "build", label: "Produkcja", description: "Tworzenie zleceń i zużycie części do budowy." },
+  { id: "machines", label: "Magazyn Maszyn", description: "Stan wyrobów gotowych i dostępność maszyn." },
+  { id: "catalog_parts", label: "Baza Części", description: "Katalog części, dostawców i statusów katalogowych." },
+  { id: "catalog_suppliers", label: "Dostawcy", description: "Baza dostawców i zarządzanie cennikami." },
+  { id: "catalog_machines", label: "Baza Maszyn", description: "Definicje maszyn i konfiguracja BOM." },
+  { id: "history", label: "Ostatnie akcje", description: "Historia dostaw, produkcji i korekt magazynowych." },
+  { id: "users", label: "Użytkownicy", description: "Użytkownicy firmy i konfiguracja ról." }
+]);
+
+const APP_TAB_ACCESS_FALLBACK = {
+  owner: APP_TABS.map(tab => tab.id),
+  admin: ["parts", "delivery", "build", "machines", "catalog_parts", "catalog_suppliers", "catalog_machines", "history"],
+  worker: ["parts", "delivery", "build", "machines"]
 };
 
 let currentActiveTab = "parts";
@@ -430,33 +436,292 @@ window.companyUsersState = window.companyUsersState || {
   loading: false,
   error: ""
 };
+window.companyRolePermissionsState = window.companyRolePermissionsState || {
+  items: {},
+  loading: false,
+  error: "",
+  selectedRole: "owner",
+  drafts: {},
+  saving: false
+};
 
 function getCurrentCompanyRole() {
   return String(window.appAuth?.companyRole || "").trim().toLowerCase();
 }
 
+function isCurrentCompanyOwner() {
+  return getCurrentCompanyRole() === 'owner';
+}
+
+function getPermissionTabDefinitions() {
+  return APP_TABS.slice();
+}
+
+function getDefaultTabPermissionsForRole(role) {
+  const normalizedRole = String(role || '').trim().toLowerCase();
+  const defaults = new Set(APP_TAB_ACCESS_FALLBACK[normalizedRole] || []);
+  const result = {};
+  APP_TABS.forEach(tab => {
+    result[tab.id] = normalizedRole === 'owner' ? true : defaults.has(tab.id);
+  });
+  return result;
+}
+
+function normalizeRoleTabPermissions(role, rawPermissions) {
+  const normalizedRole = String(role || '').trim().toLowerCase();
+  if (normalizedRole === 'owner') return getDefaultTabPermissionsForRole('owner');
+
+  const fallback = getDefaultTabPermissionsForRole(normalizedRole);
+  const source = rawPermissions && typeof rawPermissions === 'object' ? rawPermissions : {};
+  const normalized = {};
+
+  APP_TABS.forEach(tab => {
+    if (Object.prototype.hasOwnProperty.call(source, tab.id)) {
+      normalized[tab.id] = !!source[tab.id];
+    } else {
+      normalized[tab.id] = !!fallback[tab.id];
+    }
+  });
+
+  return normalized;
+}
+
+function getStoredRolePermissions(role) {
+  const normalizedRole = String(role || '').trim().toLowerCase();
+  const st = window.companyRolePermissionsState || {};
+  const items = st.items && typeof st.items === 'object' ? st.items : {};
+  return items[normalizedRole] || null;
+}
+
+function getRoleTabPermissions(role) {
+  const normalizedRole = String(role || '').trim().toLowerCase();
+  if (normalizedRole === 'owner') return getDefaultTabPermissionsForRole('owner');
+
+  const draft = window.companyRolePermissionsState?.drafts?.[normalizedRole];
+  if (draft && typeof draft === 'object') return normalizeRoleTabPermissions(normalizedRole, draft);
+
+  const stored = getStoredRolePermissions(normalizedRole);
+  return normalizeRoleTabPermissions(normalizedRole, stored?.tab_permissions);
+}
+
 function getAllowedTabsForRole(role) {
-  const normalized = String(role || "").trim().toLowerCase();
-  return Object.entries(APP_TAB_ACCESS)
-    .filter(([, roles]) => roles.includes(normalized))
-    .map(([tab]) => tab);
+  const permissions = getRoleTabPermissions(role);
+  return APP_TABS.filter(tab => !!permissions[tab.id]).map(tab => tab.id);
 }
 
 function canAccessTab(tab, roleOverride) {
+  const normalizedTab = String(tab || '').trim();
   const role = roleOverride || getCurrentCompanyRole();
-  const allowed = APP_TAB_ACCESS[String(tab || "").trim()] || [];
-  return allowed.includes(role);
+  if (String(role || '').trim().toLowerCase() === 'owner') return true;
+  const permissions = getRoleTabPermissions(role);
+  return !!permissions[normalizedTab];
 }
 
 function getDefaultTabForRole(roleOverride) {
   const role = roleOverride || getCurrentCompanyRole();
   const allowed = getAllowedTabsForRole(role);
-  return allowed.includes("parts") ? "parts" : (allowed[0] || "parts");
+  return allowed.includes('parts') ? 'parts' : (allowed[0] || 'parts');
+}
+
+async function loadCompanyRolePermissions() {
+  const st = window.companyRolePermissionsState || (window.companyRolePermissionsState = {});
+  st.loading = true;
+  st.error = '';
+
+  try {
+    const rows = await window.fetchCompanyRolePermissions?.();
+    const items = {};
+
+    (Array.isArray(rows) ? rows : []).forEach(row => {
+      const role = String(row?.role || '').trim().toLowerCase();
+      if (!role) return;
+      items[role] = {
+        ...row,
+        role,
+        tab_permissions: normalizeRoleTabPermissions(role, row?.tab_permissions)
+      };
+    });
+
+    st.items = items;
+    window.appAuth.rolePermissions = items;
+    return items;
+  } catch (err) {
+    console.error('Błąd konfiguracji ról:', err);
+    st.error = err?.message || 'Nie udało się pobrać konfiguracji ról.';
+    st.items = {};
+    window.appAuth.rolePermissions = {};
+    return st.items;
+  } finally {
+    st.loading = false;
+  }
+}
+
+function setRolePermissionsEditorRole(role) {
+  const normalizedRole = [ 'owner', 'admin', 'worker' ].includes(String(role || '').trim().toLowerCase())
+    ? String(role || '').trim().toLowerCase()
+    : 'owner';
+
+  const st = window.companyRolePermissionsState || (window.companyRolePermissionsState = {});
+  st.selectedRole = normalizedRole;
+
+  document.querySelectorAll('[data-role-permissions-role]').forEach(btn => {
+    const isActive = btn.getAttribute('data-role-permissions-role') === normalizedRole;
+    btn.classList.toggle('active', isActive);
+    btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+  });
+
+  renderUsersAdmin();
+}
+
+function toggleRolePermissionDraft(role, tabId) {
+  const normalizedRole = String(role || '').trim().toLowerCase();
+  const normalizedTabId = String(tabId || '').trim();
+  if (!['admin', 'worker'].includes(normalizedRole)) return;
+  if (!APP_TABS.some(tab => tab.id === normalizedTabId)) return;
+
+  const st = window.companyRolePermissionsState || (window.companyRolePermissionsState = {});
+  const current = getRoleTabPermissions(normalizedRole);
+  const next = { ...current, [normalizedTabId]: !current[normalizedTabId] };
+  st.drafts = st.drafts || {};
+  st.drafts[normalizedRole] = next;
+  renderUsersAdmin();
+}
+
+function resetRolePermissionDraft(role) {
+  const normalizedRole = String(role || '').trim().toLowerCase();
+  const st = window.companyRolePermissionsState || (window.companyRolePermissionsState = {});
+  if (st.drafts && Object.prototype.hasOwnProperty.call(st.drafts, normalizedRole)) {
+    delete st.drafts[normalizedRole];
+  }
+  renderUsersAdmin();
+}
+
+async function saveRolePermissions(role) {
+  const normalizedRole = String(role || '').trim().toLowerCase();
+  if (!isCurrentCompanyOwner()) {
+    toast('Brak dostępu', 'Tylko owner może zapisywać konfigurację ról.', 'warning');
+    return;
+  }
+  if (!['admin', 'worker'].includes(normalizedRole)) {
+    toast('Brak zmian', 'Owner ma zawsze pełny dostęp i nie jest ograniczany konfiguracją.', 'warning');
+    return;
+  }
+
+  const st = window.companyRolePermissionsState || (window.companyRolePermissionsState = {});
+  const permissions = getRoleTabPermissions(normalizedRole);
+  st.saving = true;
+
+  try {
+    const saved = await window.upsertCompanyRolePermissions?.(normalizedRole, permissions);
+    st.items = st.items || {};
+    st.items[normalizedRole] = {
+      ...saved,
+      role: normalizedRole,
+      tab_permissions: normalizeRoleTabPermissions(normalizedRole, saved?.tab_permissions || permissions)
+    };
+    if (st.drafts && Object.prototype.hasOwnProperty.call(st.drafts, normalizedRole)) {
+      delete st.drafts[normalizedRole];
+    }
+    window.appAuth.rolePermissions = st.items;
+    toast('Uprawnienia zapisane', `Konfiguracja roli ${normalizedRole} została zaktualizowana.`, 'success');
+  } catch (err) {
+    console.error('Błąd zapisu konfiguracji ról:', err);
+    toast('Nie zapisano konfiguracji', err?.message || 'Nie udało się zapisać konfiguracji roli.', 'error');
+  } finally {
+    st.saving = false;
+    renderUsersAdmin();
+  }
+}
+
+function renderRolePermissionsPanel() {
+  const root = document.getElementById('rolePermissionsEditor');
+  const note = document.getElementById('rolePermissionsReadOnlyNote');
+  const saveBtn = document.getElementById('rolePermissionsSaveBtn');
+  const resetBtn = document.getElementById('rolePermissionsResetBtn');
+  if (!root) return;
+
+  const st = window.companyRolePermissionsState || { items: {}, loading: false, error: '', selectedRole: 'owner', drafts: {}, saving: false };
+  const selectedRole = ['owner', 'admin', 'worker'].includes(String(st.selectedRole || '').trim().toLowerCase())
+    ? String(st.selectedRole || '').trim().toLowerCase()
+    : 'owner';
+  const isOwner = isCurrentCompanyOwner();
+  const isEditableRole = isOwner && ['admin', 'worker'].includes(selectedRole);
+  const effectivePermissions = getRoleTabPermissions(selectedRole);
+  const enabledCount = Object.values(effectivePermissions).filter(Boolean).length;
+  const totalCount = APP_TABS.length;
+
+  if (note) note.classList.toggle('hidden', isOwner);
+  if (saveBtn) {
+    saveBtn.disabled = !isEditableRole || !!st.saving;
+    saveBtn.textContent = st.saving ? 'Zapisywanie...' : 'Zapisz konfigurację';
+  }
+  if (resetBtn) resetBtn.disabled = !isEditableRole;
+
+  if (st.loading) {
+    root.innerHTML = `<div class="users-admin-readonly-note">Ładowanie konfiguracji ról...</div>`;
+    return;
+  }
+
+  if (selectedRole === 'owner') {
+    root.innerHTML = `
+      <div class="role-permissions-owner-note">
+        <h5>Owner ma pełny dostęp zawsze</h5>
+        <p>Ta rola nie korzysta z ograniczeń zapisanych w konfiguracji. Nawet jeśli kiedyś ktoś wpisze tu jakieś cuda, logika aplikacji i tak traktuje ownera jako pełny dostęp do wszystkiego.</p>
+        <div class="role-permissions-summary">
+          <span class="text-secondary">Dostęp do zakładek</span>
+          <strong>${totalCount} / ${totalCount}</strong>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  const roleLabel = selectedRole === 'admin' ? 'Administrator' : 'Pracownik';
+  const hasDraft = !!st.drafts?.[selectedRole];
+
+  root.innerHTML = `
+    <div class="role-permissions-summary">
+      <div>
+        <strong>${roleLabel}</strong>
+        <div class="text-secondary" style="font-size:var(--text-sm)">Włączasz albo wyłączasz widoczność i wejście do zakładek dla roli ${escapeHtml(selectedRole)}.</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap">
+        ${hasDraft ? '<span class="badge badge-warning">Niezapisane zmiany</span>' : '<span class="badge badge-success">Zapisane</span>'}
+        <strong>${enabledCount} / ${totalCount}</strong>
+      </div>
+    </div>
+    <div class="role-permissions-grid">
+      ${APP_TABS.map(tab => {
+        const enabled = !!effectivePermissions[tab.id];
+        return `
+          <button
+            type="button"
+            class="role-permission-tile ${enabled ? 'is-enabled' : 'is-disabled'}"
+            data-action="toggleRolePermissionTile"
+            data-role="${escapeHtml(selectedRole)}"
+            data-tab-id="${escapeHtml(tab.id)}"
+            ${isEditableRole ? '' : 'disabled'}>
+            <div class="role-permission-tile-head">
+              <div class="role-permission-tile-title">
+                <strong>${escapeHtml(tab.label)}</strong>
+                <span>${escapeHtml(tab.description)}</span>
+              </div>
+              <span class="status-pill status-pill-${enabled ? 'success' : 'warning'}">${enabled ? 'Aktywna' : 'Wyłączona'}</span>
+            </div>
+            <div class="role-permission-tile-foot">
+              <span>${escapeHtml(tab.id)}</span>
+              <span>${isEditableRole ? 'Kliknij, aby przełączyć' : 'Tylko podgląd'}</span>
+            </div>
+          </button>
+        `;
+      }).join('')}
+    </div>
+  `;
 }
 
 function setActiveTab(target, opts = {}) {
   const role = getCurrentCompanyRole();
-  const requested = String(target || "").trim();
+  const requested = String(target || '').trim();
   const fallback = getDefaultTabForRole(role);
   const nextTab = canAccessTab(requested, role) ? requested : fallback;
 
@@ -541,6 +806,7 @@ async function loadCompanyUsers() {
 function renderUsersAdmin() {
   const panel = document.querySelector('[data-tab-panel="users"]');
   const tbody = document.querySelector('#companyUsersTable tbody');
+  const createBlock = document.getElementById('usersCreateBlock');
   if (!panel || !tbody) return;
 
   if (!canAccessTab('users')) {
@@ -548,33 +814,41 @@ function renderUsersAdmin() {
     return;
   }
 
+  const isOwner = isCurrentCompanyOwner();
+  if (createBlock) createBlock.classList.toggle('hidden', !isOwner);
+
   const st = window.companyUsersState || { items: [], loading: false, error: '' };
   if (st.loading) {
     tbody.innerHTML = `<tr><td colspan="4" class="text-muted" style="text-align:center;padding:var(--space-4)">Ładowanie użytkowników...</td></tr>`;
+    renderRolePermissionsPanel();
     return;
   }
 
   if (st.error) {
     tbody.innerHTML = `<tr><td colspan="4" class="text-muted" style="text-align:center;padding:var(--space-4)">${escapeHtml(st.error)}</td></tr>`;
+    renderRolePermissionsPanel();
     return;
   }
 
   const items = Array.isArray(st.items) ? st.items : [];
   if (!items.length) {
     tbody.innerHTML = `<tr><td colspan="4" class="text-muted" style="text-align:center;padding:var(--space-4)">Brak użytkowników w firmie.</td></tr>`;
+    renderRolePermissionsPanel();
     return;
   }
 
   const currentUserId = window.appAuth?.user?.id || null;
 
   tbody.innerHTML = items.map(item => {
-    const isOwnerRow = String(item.role || '').toLowerCase() === 'owner';
+    const rowRole = String(item.role || '').toLowerCase();
+    const isOwnerRow = rowRole === 'owner';
     const isSelf = currentUserId && item.user_id === currentUserId;
-    const canModify = !isOwnerRow && !isSelf;
+    const canModify = isOwner && !isOwnerRow && !isSelf;
     const statusCls = item.is_active ? 'success' : 'warning';
     const statusLabel = item.is_active ? 'Aktywny' : 'Nieaktywny';
     const actionLabel = item.is_active ? 'Dezaktywuj' : 'Aktywuj';
     const nextActive = item.is_active ? '0' : '1';
+    const roleBadgeClass = rowRole === 'owner' ? 'badge-accent' : rowRole === 'admin' ? 'badge-success' : 'badge';
 
     return `
       <tr>
@@ -586,18 +860,22 @@ function renderUsersAdmin() {
         </td>
         <td>
           ${isOwnerRow
-            ? `<span class="badge badge-accent">owner</span>`
-            : `<span class="user-role-inline"><select class="user-role-select" data-action="userRoleChange" data-member-id="${escapeHtml(String(item.id))}" ${canModify ? '' : 'disabled'}><option value="worker" ${String(item.role) === 'worker' ? 'selected' : ''}>worker</option></select><button type="button" class="btn btn-secondary btn-sm" data-action="saveUserRole" data-member-id="${escapeHtml(String(item.id))}">Zapisz</button></span>`}
+            ? `<span class="badge ${roleBadgeClass}">owner</span>`
+            : `<span class="user-role-inline"><select class="user-role-select" data-action="userRoleChange" data-member-id="${escapeHtml(String(item.id))}" ${canModify ? '' : 'disabled'}><option value="worker" ${rowRole === 'worker' ? 'selected' : ''}>worker</option><option value="admin" ${rowRole === 'admin' ? 'selected' : ''}>admin</option></select><button type="button" class="btn btn-secondary btn-sm" data-action="saveUserRole" data-member-id="${escapeHtml(String(item.id))}" ${canModify ? '' : 'disabled'}>Zapisz</button></span>`}
         </td>
         <td><span class="status-pill status-pill-${statusCls} user-status-pill">${statusLabel}</span></td>
         <td class="text-right">
           <div class="user-row-actions">
+            ${isSelf ? '<span class="badge badge-muted">Twoje konto</span>' : ''}
+            ${isOwnerRow ? '<span class="badge badge-accent">Owner</span>' : ''}
             <button type="button" class="btn btn-secondary btn-sm" data-action="toggleUserActive" data-member-id="${escapeHtml(String(item.id))}" data-next-active="${nextActive}" ${canModify ? '' : 'disabled'}>${actionLabel}</button>
           </div>
         </td>
       </tr>
     `;
   }).join('');
+
+  renderRolePermissionsPanel();
 }
 
 function bindUserManagementUI() {
@@ -608,17 +886,24 @@ function bindUserManagementUI() {
     if (!canAccessTab('users')) return;
     try {
       renderUsersAdmin();
-      await loadCompanyUsers();
+      await Promise.all([
+        loadCompanyUsers(),
+        loadCompanyRolePermissions()
+      ]);
       renderUsersAdmin();
-      toast('Odświeżono', 'Lista użytkowników została odświeżona.', 'success');
+      toast('Odświeżono', 'Lista użytkowników i konfiguracja ról zostały odświeżone.', 'success');
     } catch (err) {
       renderUsersAdmin();
-      toast('Błąd użytkowników', err?.message || 'Nie udało się odświeżyć listy użytkowników.', 'error');
+      toast('Błąd użytkowników', err?.message || 'Nie udało się odświeżyć zakładki użytkowników.', 'error');
     }
   });
 
   document.getElementById('createWorkerBtn')?.addEventListener('click', async () => {
     if (!canAccessTab('users')) return;
+    if (!isCurrentCompanyOwner()) {
+      toast('Brak dostępu', 'Tylko owner może tworzyć nowych użytkowników.', 'warning');
+      return;
+    }
 
     const emailInput = document.getElementById('createWorkerEmailInput');
     const passwordInput = document.getElementById('createWorkerPasswordInput');
@@ -629,13 +914,13 @@ function bindUserManagementUI() {
     const role = String(roleSelect?.value || 'worker').trim().toLowerCase() || 'worker';
 
     if (!email) {
-      toast('Brak e-maila', 'Podaj adres e-mail pracownika.', 'warning');
+      toast('Brak e-maila', 'Podaj adres e-mail użytkownika.', 'warning');
       emailInput?.focus?.();
       return;
     }
 
     if (!password) {
-      toast('Brak hasła', 'Podaj hasło startowe pracownika.', 'warning');
+      toast('Brak hasła', 'Podaj hasło startowe użytkownika.', 'warning');
       passwordInput?.focus?.();
       return;
     }
@@ -643,6 +928,11 @@ function bindUserManagementUI() {
     if (password.length < 6) {
       toast('Za krótkie hasło', 'Hasło startowe musi mieć co najmniej 6 znaków.', 'warning');
       passwordInput?.focus?.();
+      return;
+    }
+
+    if (!['worker', 'admin'].includes(role)) {
+      toast('Nieprawidłowa rola', 'Na tym etapie możesz tworzyć tylko role worker albo admin.', 'warning');
       return;
     }
 
@@ -661,37 +951,77 @@ function bindUserManagementUI() {
 
       if (emailInput) emailInput.value = '';
       if (passwordInput) passwordInput.value = '';
+      if (roleSelect) roleSelect.value = 'worker';
 
       await loadCompanyUsers();
       renderUsersAdmin();
 
       toast(
-        'Pracownik utworzony',
-        result?.message || `Konto ${email} zostało utworzone.`,
+        'Użytkownik utworzony',
+        result?.message || `Konto ${email} z rolą ${role} zostało utworzone.`,
         'success'
       );
     } catch (err) {
-      console.error('Błąd tworzenia pracownika:', err);
+      console.error('Błąd tworzenia użytkownika:', err);
       toast(
-        'Nie utworzono pracownika',
-        err?.message || 'Nie udało się utworzyć konta pracownika.',
+        'Nie utworzono użytkownika',
+        err?.message || 'Nie udało się utworzyć konta użytkownika.',
         'error'
       );
     } finally {
       if (btn) {
         btn.disabled = false;
-        btn.textContent = 'Utwórz pracownika';
+        btn.textContent = 'Utwórz użytkownika';
       }
     }
   });
 
+  document.getElementById('rolePermissionsSaveBtn')?.addEventListener('click', async () => {
+    const role = window.companyRolePermissionsState?.selectedRole || 'owner';
+    await saveRolePermissions(role);
+  });
+
+  document.getElementById('rolePermissionsResetBtn')?.addEventListener('click', () => {
+    const role = window.companyRolePermissionsState?.selectedRole || 'owner';
+    if (!['admin', 'worker'].includes(String(role || '').trim().toLowerCase())) return;
+    resetRolePermissionDraft(role);
+    toast('Przywrócono', `Cofnięto niezapisane zmiany dla roli ${role}.`, 'success');
+  });
+
   document.addEventListener('click', async (e) => {
+    const roleSwitchBtn = e.target?.closest?.('[data-role-permissions-role]');
+    if (roleSwitchBtn) {
+      setRolePermissionsEditorRole(roleSwitchBtn.getAttribute('data-role-permissions-role'));
+      return;
+    }
+
+    const toggleTileBtn = e.target?.closest?.('[data-action="toggleRolePermissionTile"]');
+    if (toggleTileBtn) {
+      if (!isCurrentCompanyOwner()) {
+        toast('Brak dostępu', 'Tylko owner może zmieniać konfigurację ról.', 'warning');
+        return;
+      }
+      toggleRolePermissionDraft(
+        toggleTileBtn.getAttribute('data-role'),
+        toggleTileBtn.getAttribute('data-tab-id')
+      );
+      return;
+    }
+
     const saveRoleBtn = e.target?.closest?.('[data-action="saveUserRole"]');
     if (saveRoleBtn) {
       if (!canAccessTab('users')) return;
+      if (!isCurrentCompanyOwner()) {
+        toast('Brak dostępu', 'Tylko owner może zmieniać role użytkowników.', 'warning');
+        return;
+      }
       const memberId = saveRoleBtn.getAttribute('data-member-id');
       const select = document.querySelector(`[data-action="userRoleChange"][data-member-id="${CSS.escape(memberId)}"]`);
       const nextRole = String(select?.value || 'worker').trim().toLowerCase();
+      if (!['worker', 'admin'].includes(nextRole)) {
+        toast('Nieprawidłowa rola', 'Można ustawić tylko rolę worker albo admin.', 'warning');
+        return;
+      }
       try {
         await window.updateCompanyMember?.(memberId, { role: nextRole });
         await loadCompanyUsers();
@@ -707,6 +1037,10 @@ function bindUserManagementUI() {
     const toggleActiveBtn = e.target?.closest?.('[data-action="toggleUserActive"]');
     if (toggleActiveBtn) {
       if (!canAccessTab('users')) return;
+      if (!isCurrentCompanyOwner()) {
+        toast('Brak dostępu', 'Tylko owner może zmieniać status użytkowników.', 'warning');
+        return;
+      }
       const memberId = toggleActiveBtn.getAttribute('data-member-id');
       const nextActive = toggleActiveBtn.getAttribute('data-next-active') === '1';
       try {
@@ -1031,6 +1365,9 @@ function bindAuthUI() {
         return;
       }
 
+      if (result?.ok && window.appAuth?.session) {
+        await loadCompanyRolePermissions();
+      }
       updateAuthUI();
 
       const hasSession = !!window.appAuth?.session;
@@ -1079,10 +1416,13 @@ async function init() {
   bindSupplierEditorModal();
   bindSearch();
   bindUserManagementUI();
+  setRolePermissionsEditorRole(window.companyRolePermissionsState?.selectedRole || 'owner');
   initHistoryViewToggle();
   initHistoryFilters();
   initSidePanelSignals();
   initBeforeUnloadWarning();
+
+  await loadCompanyRolePermissions();
 
   renderWarehouse();
   renderAllSuppliers();

@@ -18,6 +18,7 @@ const THRESHOLDS_OPEN_KEY = "magazyn_thresholds_open_v3";
 // Anti-double-click guards for critical operations
 let _finalizeDeliveryBusy = false;
 let _finalizeBuildBusy = false;
+let _stockAdjustmentsBusy = false;
 
 // === STATE ===
 const state = {
@@ -80,30 +81,16 @@ function ensureUiState() {
 }
 
 function serializeState() {
+  ensureUiState();
   return {
-    lots: state.lots,
-    machinesStock: state.machinesStock,
-    machineCatalog: state.machineCatalog.map(machine => ({
-      ...machine,
-      archived: !!machine?.archived
-    })),
     currentDelivery: state.currentDelivery,
     currentBuild: state.currentBuild,
-    history: state.history,
+    ui: {
+      showArchivedPartsInWarehouse: shouldShowArchivedPartsInWarehouse(),
+      showArchivedMachinesInStock: shouldShowArchivedMachinesInStock()
+    },
     LOW_WARN,
-    LOW_DANGER,
-    partsCatalog: Array.from(state.partsCatalog.entries()).map(([key, part]) => ([key, {
-      sku: normalize(part?.sku),
-      name: normalize(part?.name),
-      yellowThreshold: normalizeThresholdValue(part?.yellowThreshold),
-      redThreshold: normalizeThresholdValue(part?.redThreshold),
-      archived: !!part?.archived
-    }])),
-    suppliers: Array.from(state.suppliers.entries()).map(([name, data]) => ({
-      name,
-      archived: !!data?.archived,
-      prices: Array.from((data?.prices instanceof Map ? data.prices : new Map()).entries())
-    }))
+    LOW_DANGER
   };
 }
 
@@ -112,32 +99,6 @@ function restoreState(data) {
   if (!data || typeof data !== "object") return;
 
   const asArr = (x) => Array.isArray(x) ? x : [];
-
-  state.lots = asArr(data.lots).map(l => ({
-    id: (typeof l?.id === "number") ? l.id : nextId(),
-    sku: normalize(l?.sku),
-    name: normalize(l?.name),
-    supplier: normalize(l?.supplier) || "-",
-    unitPrice: safeFloat(l?.unitPrice ?? 0),
-    qty: safeQtyInt(l?.qty),
-    dateIn: normalize(l?.dateIn)
-  })).filter(l => l.sku && l.name);
-
-  state.machinesStock = asArr(data.machinesStock).map(m => ({
-    code: normalize(m?.code),
-    name: normalize(m?.name),
-    qty: safeQtyInt(m?.qty)
-  })).filter(m => m.code);
-
-  state.machineCatalog = asArr(data.machineCatalog).map(m => ({
-    code: normalize(m?.code),
-    name: normalize(m?.name),
-    archived: !!m?.archived,
-    bom: asArr(m?.bom).map(b => ({
-      sku: normalize(b?.sku),
-      qty: safeInt(b?.qty)
-    })).filter(b => b.sku)
-  })).filter(m => m.code && m.name);
 
   const rawCurrentDelivery = (data.currentDelivery && typeof data.currentDelivery === "object") ? data.currentDelivery : {};
   state.currentDelivery = {
@@ -170,7 +131,10 @@ function restoreState(data) {
     })).filter(b => b.sku)
   })).filter(i => i.machineCode);
 
-  state.history = asArr(data.history).filter(Boolean);
+  if (data.ui && typeof data.ui === "object") {
+    state.ui.showArchivedPartsInWarehouse = data.ui.showArchivedPartsInWarehouse !== false;
+    state.ui.showArchivedMachinesInStock = data.ui.showArchivedMachinesInStock !== false;
+  }
 
   // Thresholds with invariants
   LOW_WARN = (strictNonNegInt(data.LOW_WARN) ?? 100);
@@ -179,56 +143,45 @@ function restoreState(data) {
   if (LOW_DANGER < 0) LOW_DANGER = 0;
   if (LOW_DANGER > LOW_WARN) LOW_DANGER = LOW_WARN;
 
-  // Restore Maps
-  state.partsCatalog = new Map();
-  const pc = (Array.isArray(data.partsCatalog) ? data.partsCatalog : []);
-  for (const ent of pc) {
-    if (!Array.isArray(ent) || ent.length < 2) continue;
-    const rawKey = ent[0];
-    const v = ent[1] || {};
-    const k = skuKey(rawKey);
-    const sku = normalize(v.sku ?? rawKey);
-    const name = normalize(v.name);
-    if (!k || !sku || !name) continue;
-    state.partsCatalog.set(k, {
-      sku,
-      name,
-      yellowThreshold: normalizeThresholdValue(v?.yellowThreshold),
-      redThreshold: normalizeThresholdValue(v?.redThreshold),
-      archived: !!v?.archived
-    });
-  }
-
-  state.suppliers = new Map();
-  const sups = Array.isArray(data.suppliers) ? data.suppliers : [];
-  for (const s of sups) {
-    let name = "";
-    let pricesRaw = [];
-    if (Array.isArray(s)) {
-      name = normalize(s[0]);
-      pricesRaw = Array.isArray(s[1]?.prices) ? s[1].prices : [];
-    } else {
-      name = normalize(s?.name);
-      pricesRaw = Array.isArray(s?.prices) ? s.prices : [];
-    }
-    if (!name) continue;
-    const prices = new Map();
-    for (const pe of pricesRaw) {
-      if (!Array.isArray(pe) || pe.length < 2) continue;
-      const pk = skuKey(pe[0]);
-      if (!pk) continue;
-      prices.set(pk, safeFloat(pe[1]));
-    }
-    state.suppliers.set(name, {
-      archived: !!s?.archived,
-      prices
-    });
-  }
 
   state.ui.stockEditMode = false;
   state.ui.pendingStockAdjustments = {};
-  state.ui.showArchivedPartsInWarehouse = true;
-  state.ui.showArchivedMachinesInStock = true;
+
+  clearArchivedItemsFromDrafts();
+  syncIdCounter();
+}
+
+
+function applyOperationalState(nextOperationalState = {}) {
+  state.lots = Array.isArray(nextOperationalState?.lots)
+    ? nextOperationalState.lots.map(lot => ({
+        id: lot?.id,
+        sku: normalize(lot?.sku),
+        name: normalize(lot?.name),
+        supplier: normalize(lot?.supplier) || '-',
+        unitPrice: safeFloat(lot?.unitPrice ?? 0),
+        qty: safeQtyInt(lot?.qty),
+        dateIn: normalize(lot?.dateIn)
+      })).filter(lot => lot.sku && lot.name)
+    : [];
+
+  state.machinesStock = Array.isArray(nextOperationalState?.machinesStock)
+    ? nextOperationalState.machinesStock.map(item => ({
+        code: normalize(item?.code),
+        name: normalize(item?.name),
+        qty: safeQtyInt(item?.qty),
+        _rowId: item?._rowId ?? item?.rowId ?? null,
+        _machineDefinitionId: item?._machineDefinitionId ?? item?.machineDefinitionId ?? null
+      })).filter(item => item.code)
+    : [];
+
+  state.history = Array.isArray(nextOperationalState?.history)
+    ? nextOperationalState.history.filter(Boolean)
+    : [];
+
+  ensureUiState();
+  state.ui.stockEditMode = false;
+  state.ui.pendingStockAdjustments = {};
 
   clearArchivedItemsFromDrafts();
   syncIdCounter();
@@ -389,6 +342,54 @@ function clearArchivedItemsFromDrafts() {
   if (state.currentBuild && Array.isArray(state.currentBuild.items)) {
     state.currentBuild.items = state.currentBuild.items.filter(item => !isMachineArchived(item?.machineCode));
   }
+}
+
+function applyCatalogState(nextCatalogState = {}) {
+  const nextPartsCatalog = nextCatalogState?.partsCatalog instanceof Map ? nextCatalogState.partsCatalog : new Map();
+  const nextSuppliers = nextCatalogState?.suppliers instanceof Map ? nextCatalogState.suppliers : new Map();
+  const nextMachineCatalog = Array.isArray(nextCatalogState?.machineCatalog) ? nextCatalogState.machineCatalog : [];
+
+  state.partsCatalog = new Map(nextPartsCatalog);
+  state.suppliers = new Map(
+    Array.from(nextSuppliers.entries()).map(([name, data]) => ([name, {
+      archived: !!data?.archived,
+      prices: new Map(data?.prices instanceof Map ? data.prices : [])
+    }]))
+  );
+  state.machineCatalog = nextMachineCatalog.map(machine => ({
+    code: normalize(machine?.code),
+    name: normalize(machine?.name),
+    archived: !!machine?.archived,
+    bom: Array.isArray(machine?.bom)
+      ? machine.bom.map(item => ({ sku: normalize(item?.sku), qty: safeInt(item?.qty) })).filter(item => item.sku)
+      : []
+  })).filter(machine => machine.code && machine.name);
+
+  clearArchivedItemsFromDrafts();
+  syncIdCounter();
+}
+
+function applyPartNameChangeAcrossOperationalState(partSkuRaw, nextNameRaw) {
+  const key = skuKey(partSkuRaw);
+  const nextName = normalize(nextNameRaw);
+  if (!key || !nextName) return;
+
+  state.lots.forEach(lot => {
+    if (skuKey(lot?.sku) === key) lot.name = nextName;
+  });
+
+  state.currentDelivery.items.forEach(item => {
+    if (skuKey(item?.sku) === key) item.name = nextName;
+  });
+
+  state.currentBuild.items.forEach(item => {
+    const bomSnapshot = Array.isArray(item?.bomSnapshot) ? item.bomSnapshot : [];
+    bomSnapshot.forEach(bomItem => {
+      if (skuKey(bomItem?.sku) === key) bomItem.name = nextName;
+    });
+  });
+
+  updateHistoryPartReferences(key, { sku: normalize(partSkuRaw), name: nextName });
 }
 
 function setPartArchived(skuRaw, archived) {
@@ -657,7 +658,7 @@ function addToDelivery(supplier, skuRaw, qty, price) {
   renderDelivery();
 }
 
-function finalizeDelivery() {
+async function finalizeDelivery() {
   if (_finalizeDeliveryBusy) {
     toast("Operacja w toku", "Przetwarzanie dostawy już trwa - proszę czekać.", "warning");
     return;
@@ -673,13 +674,11 @@ function finalizeDelivery() {
     const d = state.currentDelivery;
     if (!d.items.length) {
       toast("Brak pozycji", "Dodaj przynajmniej jedną pozycję do dostawy.", "warning");
-      _finalizeDeliveryBusy = false;
       return;
     }
     if (!d.dateISO) {
       toast("Brak daty", "Podaj datę dostawy.", "warning");
       dateInput?.focus();
-      _finalizeDeliveryBusy = false;
       return;
     }
     
@@ -687,38 +686,23 @@ function finalizeDelivery() {
     if (!dateValidation.valid) {
       toast("Nieprawidłowa data", dateValidation.error, "warning");
       dateInput?.focus();
-      _finalizeDeliveryBusy = false;
       return;
     }
 
     const itemCount = d.items.length;
-
-    d.items.forEach(item => {
-      const unitPrice = item.price ?? item.unitPrice ?? 0;
-      state.lots.push({
-        id: nextId(),
-        sku: item.sku,
-        name: item.name,
-        supplier: d.supplier,
-        unitPrice: safeFloat(unitPrice),
-        qty: safeInt(item.qty),
-        dateIn: d.dateISO
-      });
-    });
-
-    addHistoryEvent({
-      id: nextId(),
-      ts: Date.now(),
-      type: "delivery",
+    const payload = {
+      supplier: normalize(d.supplier),
       dateISO: d.dateISO,
-      supplier: d.supplier,
       items: d.items.map(it => ({
-        sku: it.sku,
-        name: it.name,
+        sku: normalize(it.sku),
+        name: normalize(it.name),
         qty: safeInt(it.qty),
-        price: safeFloat(it.price)
+        price: safeFloat(it.price ?? it.unitPrice ?? 0)
       }))
-    });
+    };
+
+    await window.saveDeliveryToSupabase?.(payload);
+    await window.loadOperationalStateFromSupabaseIntoState?.({ silent: true });
 
     state.currentDelivery.items = [];
     state.currentDelivery.supplier = null;
@@ -730,6 +714,9 @@ function finalizeDelivery() {
     renderWarehouse();
     renderHistory();
     toast("Dostawa przyjęta", `Przyjęto ${itemCount} pozycji na stan magazynowy.`, "success");
+  } catch (err) {
+    console.error("Błąd zapisu dostawy do Supabase:", err);
+    toast("Nie zapisano dostawy", err?.message || "Nie udało się zapisać dostawy w Supabase.", "error");
   } finally {
     _finalizeDeliveryBusy = false;
   }
@@ -841,7 +828,7 @@ function checkStockAvailability(needs) {
   return missing;
 }
 
-function finalizeBuild(manualAllocation = null) {
+async function finalizeBuild(manualAllocation = null) {
   if (_finalizeBuildBusy) {
     toast("Operacja w toku", "Produkcja jest już przetwarzana - proszę czekać.", "warning");
     return;
@@ -859,7 +846,6 @@ function finalizeBuild(manualAllocation = null) {
     if (!dateValidation.valid) {
       toast("Nieprawidłowa data", dateValidation.error, "warning");
       buildDateInput?.focus();
-      _finalizeBuildBusy = false;
       return;
     }
 
@@ -868,11 +854,11 @@ function finalizeBuild(manualAllocation = null) {
 
     if (missing.length > 0) {
       renderMissingParts(missing);
-      _finalizeBuildBusy = false;
       return;
     }
 
     const lotsClone = JSON.parse(JSON.stringify(state.lots));
+    const machinesStockClone = (state.machinesStock || []).map(item => ({ ...item }));
     const lotSnapshotById = new Map();
     (state.lots || []).forEach(l => { 
       if (l && l.id != null) lotSnapshotById.set(String(l.id), JSON.parse(JSON.stringify(l))); 
@@ -903,15 +889,17 @@ function finalizeBuild(manualAllocation = null) {
         const k = skuKey(lot.sku);
 
         if (!requirements.has(k)) {
-          return toast(
+          toast(
             "Błąd alokacji",
             `Partia #${lotId} (${lot.sku}) nie jest potrzebna do tej produkcji.`,
             "error"
           );
+          return;
         }
 
         if (take > safeQtyInt(lot.qty)) {
-          return toast("Za mało w partii", `W partii #${lotId} dostępne jest tylko ${lot.qty} sztuk, a próbowano pobrać ${take}.`, "error");
+          toast("Za mało w partii", `W partii #${lotId} dostępne jest tylko ${lot.qty} sztuk, a próbowano pobrać ${take}.`, "error");
+          return;
         }
 
         takenBySku.set(k, (takenBySku.get(k) || 0) + take);
@@ -922,7 +910,8 @@ function finalizeBuild(manualAllocation = null) {
         if (got !== needed) {
           const skuLabel = state.partsCatalog.get(k)?.sku || k;
           const nameLabel = state.partsCatalog.get(k)?.name || "";
-          return toast("Niekompletna alokacja", `Dla części ${skuLabel} ${nameLabel ? `(${nameLabel}) ` : ""}wybrano ${got}, a potrzeba ${needed}.`, "error");
+          toast("Niekompletna alokacja", `Dla części ${skuLabel} ${nameLabel ? `(${nameLabel}) ` : ""}wybrano ${got}, a potrzeba ${needed}.`, "error");
+          return;
         }
       }
 
@@ -958,10 +947,10 @@ function finalizeBuild(manualAllocation = null) {
       }
     }
 
-    state.lots = lotsClone.filter(l => l.qty > 0);
+    const nextLots = lotsClone.filter(l => l.qty > 0);
     
     state.currentBuild.items.forEach(bi => {
-      const existing = state.machinesStock.find(m => m.code === bi.machineCode);
+      const existing = machinesStockClone.find(m => m.code === bi.machineCode);
       const machineDef = state.machineCatalog.find(m => m.code === bi.machineCode);
       const currentName = machineDef ? machineDef.name : getBuildItemMachineName(bi);
 
@@ -969,10 +958,12 @@ function finalizeBuild(manualAllocation = null) {
         existing.qty += bi.qty;
         existing.name = currentName;
       } else {
-        state.machinesStock.push({ 
+        machinesStockClone.push({ 
           code: bi.machineCode, 
           name: currentName, 
-          qty: bi.qty 
+          qty: bi.qty,
+          _rowId: null,
+          _machineDefinitionId: null
         });
       }
     });
@@ -1037,13 +1028,19 @@ function finalizeBuild(manualAllocation = null) {
       };
     });
 
-    addHistoryEvent({
-      id: nextId(),
-      ts: Date.now(),
+    const historyEvent = {
       type: "build",
       dateISO: buildISO,
       items: buildItemsDetailed
+    };
+
+    await window.saveBuildToSupabase?.({
+      buildISO,
+      nextLots,
+      nextMachineStock: machinesStockClone,
+      historyEvent
     });
+    await window.loadOperationalStateFromSupabaseIntoState?.({ silent: true });
     
     state.currentBuild.items = [];
     state.currentBuild.dateISO = "";
@@ -1055,6 +1052,9 @@ function finalizeBuild(manualAllocation = null) {
     renderMachinesStock();
     renderHistory();
     toast("Produkcja zakończona", "Stany magazynowe zostały zaktualizowane.", "success");
+  } catch (err) {
+    console.error("Błąd finalizacji produkcji w Supabase:", err);
+    toast("Nie zapisano produkcji", err?.message || "Nie udało się zapisać produkcji w Supabase.", "error");
   } finally {
     _finalizeBuildBusy = false;
   }
@@ -1289,130 +1289,142 @@ function updatePendingStockAdjustment(skuRaw, rawValue) {
   renderWarehouse();
 }
 
-function commitStockAdjustments() {
-  ensureUiState();
-  const pending = Object.values(state.ui.pendingStockAdjustments || {});
-  const invalid = pending.find(item => item && item.invalid);
-  if (invalid) {
-    toast("Błędne dane", `Popraw wartość dla części ${invalid.sku || "—"}.`, "warning");
+async function commitStockAdjustments() {
+  if (_stockAdjustmentsBusy) {
+    toast("Operacja w toku", "Korekty stanów są już zapisywane.", "warning");
     return;
   }
+  _stockAdjustmentsBusy = true;
 
-  const changes = pending
-    .filter(Boolean)
-    .map(item => ({
-      sku: normalize(item.sku),
-      name: normalize(item.name),
-      previousQty: safeQtyInt(item.previousQty),
-      newQty: safeQtyInt(item.newQty),
-      diff: safeQtyInt(item.newQty) - safeQtyInt(item.previousQty)
-    }))
-    .filter(item => item.newQty !== item.previousQty);
+  try {
+    ensureUiState();
+    const pending = Object.values(state.ui.pendingStockAdjustments || {});
+    const invalid = pending.find(item => item && item.invalid);
+    if (invalid) {
+      toast("Błędne dane", `Popraw wartość dla części ${invalid.sku || "—"}.`, "warning");
+      return;
+    }
 
-  if (!changes.length) {
-    state.ui.stockEditMode = false;
-    state.ui.pendingStockAdjustments = {};
-    renderWarehouse();
-    toast("Brak zmian", "Nie wykryto realnych korekt do zapisania.", "warning");
-    return;
-  }
+    const changes = pending
+      .filter(Boolean)
+      .map(item => ({
+        sku: normalize(item.sku),
+        name: normalize(item.name),
+        previousQty: safeQtyInt(item.previousQty),
+        newQty: safeQtyInt(item.newQty),
+        diff: safeQtyInt(item.newQty) - safeQtyInt(item.previousQty)
+      }))
+      .filter(item => item.newQty !== item.previousQty);
 
-  const lotsClone = JSON.parse(JSON.stringify(state.lots || []));
-  const dateISO = getTodayISO();
-  const historyItems = [];
+    if (!changes.length) {
+      state.ui.stockEditMode = false;
+      state.ui.pendingStockAdjustments = {};
+      renderWarehouse();
+      toast("Brak zmian", "Nie wykryto realnych korekt do zapisania.", "warning");
+      return;
+    }
 
-  for (const change of changes) {
-    const k = skuKey(change.sku);
-    if (change.diff > 0) {
-      const referenceUnitPrice = getLastKnownUnitPrice(change.sku);
-      const newLot = {
-        id: nextId(),
-        sku: change.sku,
-        name: change.name,
-        supplier: "Korekta stanu",
-        unitPrice: safeFloat(referenceUnitPrice),
-        qty: safeQtyInt(change.diff),
-        dateIn: dateISO
-      };
-      lotsClone.push(newLot);
+    const lotsClone = JSON.parse(JSON.stringify(state.lots || []));
+    const dateISO = getTodayISO();
+    const historyItems = [];
+
+    for (const change of changes) {
+      const k = skuKey(change.sku);
+      if (change.diff > 0) {
+        const referenceUnitPrice = getLastKnownUnitPrice(change.sku);
+        const newLot = {
+          sku: change.sku,
+          name: change.name,
+          supplier: "Korekta stanu",
+          unitPrice: safeFloat(referenceUnitPrice),
+          qty: safeQtyInt(change.diff),
+          dateIn: dateISO
+        };
+        lotsClone.push(newLot);
+        historyItems.push({
+          sku: change.sku,
+          name: change.name,
+          previousQty: change.previousQty,
+          newQty: change.newQty,
+          diff: change.diff,
+          direction: "plus",
+          referenceUnitPrice: safeFloat(referenceUnitPrice),
+          createdLot: {
+            lotId: null,
+            qty: safeQtyInt(newLot.qty),
+            supplier: newLot.supplier,
+            dateIn: newLot.dateIn,
+            unitPrice: safeFloat(newLot.unitPrice)
+          },
+          affectedLots: []
+        });
+        continue;
+      }
+
+      let remainingToRemove = Math.abs(change.diff);
+      const affectedLots = [];
+      const relevantLots = lotsClone
+        .filter(l => skuKey(l.sku) === k && safeQtyInt(l.qty) > 0)
+        .sort(compareLotsForConsumption);
+
+      for (const lot of relevantLots) {
+        if (remainingToRemove <= 0) break;
+        const available = safeQtyInt(lot.qty);
+        if (available <= 0) continue;
+        const taken = Math.min(available, remainingToRemove);
+        lot.qty = available - taken;
+        remainingToRemove -= taken;
+        affectedLots.push({
+          lotId: lot.id != null ? String(lot.id) : null,
+          removedQty: safeQtyInt(taken),
+          supplier: lot.supplier || "-",
+          dateIn: lot.dateIn || null,
+          unitPrice: safeFloat(lot.unitPrice || 0),
+          remainingAfter: safeQtyInt(lot.qty)
+        });
+      }
+
+      if (remainingToRemove > 0) {
+        toast("Błąd korekty", `Nie udało się odjąć pełnej ilości dla części ${change.sku}.`, "error");
+        return;
+      }
+
       historyItems.push({
         sku: change.sku,
         name: change.name,
         previousQty: change.previousQty,
         newQty: change.newQty,
         diff: change.diff,
-        direction: "plus",
-        referenceUnitPrice: safeFloat(referenceUnitPrice),
-        createdLot: {
-          lotId: String(newLot.id),
-          qty: safeQtyInt(newLot.qty),
-          supplier: newLot.supplier,
-          dateIn: newLot.dateIn,
-          unitPrice: safeFloat(newLot.unitPrice)
-        },
-        affectedLots: []
-      });
-      continue;
-    }
-
-    let remainingToRemove = Math.abs(change.diff);
-    const affectedLots = [];
-    const relevantLots = lotsClone
-      .filter(l => skuKey(l.sku) === k && safeQtyInt(l.qty) > 0)
-      .sort(compareLotsForConsumption);
-
-    for (const lot of relevantLots) {
-      if (remainingToRemove <= 0) break;
-      const available = safeQtyInt(lot.qty);
-      if (available <= 0) continue;
-      const taken = Math.min(available, remainingToRemove);
-      lot.qty = available - taken;
-      remainingToRemove -= taken;
-      affectedLots.push({
-        lotId: String(lot.id),
-        removedQty: safeQtyInt(taken),
-        supplier: lot.supplier || "-",
-        dateIn: lot.dateIn || null,
-        unitPrice: safeFloat(lot.unitPrice || 0),
-        remainingAfter: safeQtyInt(lot.qty)
+        direction: "minus",
+        referenceUnitPrice: 0,
+        affectedLots
       });
     }
 
-    if (remainingToRemove > 0) {
-      toast("Błąd korekty", `Nie udało się odjąć pełnej ilości dla części ${change.sku}.`, "error");
-      return;
-    }
+    const nextLots = lotsClone.filter(l => safeQtyInt(l.qty) > 0);
+    const historyEvent = {
+      type: "adjustment",
+      dateISO,
+      partsChanged: historyItems.length,
+      items: historyItems
+    };
 
-    historyItems.push({
-      sku: change.sku,
-      name: change.name,
-      previousQty: change.previousQty,
-      newQty: change.newQty,
-      diff: change.diff,
-      direction: "minus",
-      referenceUnitPrice: 0,
-      affectedLots
-    });
+    await window.saveStockAdjustmentToSupabase?.({ nextLots, historyEvent });
+    await window.loadOperationalStateFromSupabaseIntoState?.({ silent: true });
+
+    state.ui.stockEditMode = false;
+    state.ui.pendingStockAdjustments = {};
+
+    save();
+    renderWarehouse();
+    renderHistory();
+    toast("Korekty zapisane", `Zapisano korekty dla ${historyItems.length} ${historyItems.length === 1 ? "części" : "części"}.`, "success");
+  } catch (err) {
+    console.error("Błąd zapisu korekt do Supabase:", err);
+    toast("Nie zapisano korekt", err?.message || "Nie udało się zapisać korekt stanów w Supabase.", "error");
+  } finally {
+    _stockAdjustmentsBusy = false;
   }
-
-  state.lots = lotsClone.filter(l => safeQtyInt(l.qty) > 0);
-
-  addHistoryEvent({
-    id: nextId(),
-    ts: Date.now(),
-    type: "adjustment",
-    dateISO,
-    partsChanged: historyItems.length,
-    items: historyItems
-  });
-
-  state.ui.stockEditMode = false;
-  state.ui.pendingStockAdjustments = {};
-
-  save();
-  renderWarehouse();
-  renderHistory();
-  toast("Korekty zapisane", `Zapisano korekty dla ${historyItems.length} ${historyItems.length === 1 ? "części" : "części"}.`, "success");
 }
 
 // === DEBOUNCE UTILITY ===

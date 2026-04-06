@@ -418,6 +418,796 @@ window.createCompanyWorker = async function createCompanyWorker(payload = {}) {
   return window.createCompanyUser(payload);
 };
 
+function requireBusinessCompanyId(companyIdOverride) {
+  const companyId = companyIdOverride || window.appAuth?.companyId;
+  if (!window.sb) throw new Error("Brak klienta Supabase.");
+  if (!companyId) throw new Error("Brak company_id w kontekście użytkownika.");
+  return companyId;
+}
+
+window.fetchCatalogParts = async function fetchCatalogParts(companyIdOverride) {
+  const companyId = requireBusinessCompanyId(companyIdOverride);
+  const { data, error } = await window.sb
+    .from("parts")
+    .select("id, company_id, sku, name, is_active, warning_qty, critical_qty")
+    .eq("company_id", companyId)
+    .order("sku", { ascending: true });
+
+  if (error) throw error;
+  return Array.isArray(data) ? data : [];
+};
+
+window.fetchCatalogSuppliers = async function fetchCatalogSuppliers(companyIdOverride) {
+  const companyId = requireBusinessCompanyId(companyIdOverride);
+  const { data, error } = await window.sb
+    .from("suppliers")
+    .select("id, company_id, name, is_active")
+    .eq("company_id", companyId)
+    .order("name", { ascending: true });
+
+  if (error) throw error;
+  return Array.isArray(data) ? data : [];
+};
+
+window.fetchSupplierPartPrices = async function fetchSupplierPartPrices() {
+  requireBusinessCompanyId();
+  const { data, error } = await window.sb
+    .from("supplier_part_prices")
+    .select("id, supplier_id, part_id, price")
+    .order("id", { ascending: true });
+
+  if (error) throw error;
+  return Array.isArray(data) ? data : [];
+};
+
+window.fetchMachineDefinitions = async function fetchMachineDefinitions(companyIdOverride) {
+  const companyId = requireBusinessCompanyId(companyIdOverride);
+  const { data, error } = await window.sb
+    .from("machine_definitions")
+    .select("id, company_id, code, name, is_active")
+    .eq("company_id", companyId)
+    .order("code", { ascending: true });
+
+  if (error) throw error;
+  return Array.isArray(data) ? data : [];
+};
+
+window.fetchMachineBomItems = async function fetchMachineBomItems() {
+  requireBusinessCompanyId();
+  const { data, error } = await window.sb
+    .from("machine_bom_items")
+    .select("id, machine_definition_id, part_id, qty")
+    .order("id", { ascending: true });
+
+  if (error) throw error;
+  return Array.isArray(data) ? data : [];
+};
+
+window.fetchCatalogStateFromSupabase = async function fetchCatalogStateFromSupabase(companyIdOverride) {
+  const [partsRows, suppliersRows, priceRows, machineRows, bomRows] = await Promise.all([
+    window.fetchCatalogParts(companyIdOverride),
+    window.fetchCatalogSuppliers(companyIdOverride),
+    window.fetchSupplierPartPrices(),
+    window.fetchMachineDefinitions(companyIdOverride),
+    window.fetchMachineBomItems()
+  ]);
+
+  const partsById = new Map();
+  const partsCatalog = new Map();
+  (partsRows || []).forEach(row => {
+    const sku = String(row?.sku || '').trim();
+    const key = sku.toLowerCase();
+    const name = String(row?.name || '').trim();
+    if (!row?.id || !sku || !name) return;
+    partsById.set(row.id, row);
+    partsCatalog.set(key, {
+      sku,
+      name,
+      yellowThreshold: Number.isInteger(row?.warning_qty) ? row.warning_qty : (row?.warning_qty == null ? null : Math.max(0, Math.trunc(Number(row.warning_qty) || 0))),
+      redThreshold: Number.isInteger(row?.critical_qty) ? row.critical_qty : (row?.critical_qty == null ? null : Math.max(0, Math.trunc(Number(row.critical_qty) || 0))),
+      archived: row?.is_active === false
+    });
+  });
+
+  const suppliersById = new Map();
+  const suppliers = new Map();
+  (suppliersRows || []).forEach(row => {
+    const name = String(row?.name || '').trim();
+    if (!row?.id || !name) return;
+    suppliersById.set(row.id, row);
+    suppliers.set(name, {
+      archived: row?.is_active === false,
+      prices: new Map()
+    });
+  });
+
+  (priceRows || []).forEach(row => {
+    const supplier = suppliersById.get(row?.supplier_id);
+    const part = partsById.get(row?.part_id);
+    if (!supplier || !part) return;
+    const supplierEntry = suppliers.get(String(supplier.name || '').trim());
+    const partKey = String(part.sku || '').trim().toLowerCase();
+    if (!supplierEntry || !partKey) return;
+    supplierEntry.prices.set(partKey, Math.max(0, Number(row?.price) || 0));
+  });
+
+  const machineRowsById = new Map();
+  const bomByMachineId = new Map();
+
+  (machineRows || []).forEach(row => {
+    if (!row?.id) return;
+    machineRowsById.set(row.id, row);
+    bomByMachineId.set(row.id, []);
+  });
+
+  (bomRows || []).forEach(row => {
+    const machineId = row?.machine_definition_id;
+    const part = partsById.get(row?.part_id);
+    if (!machineId || !part || !bomByMachineId.has(machineId)) return;
+    bomByMachineId.get(machineId).push({
+      sku: String(part.sku || '').trim(),
+      qty: Math.max(1, Math.trunc(Number(row?.qty) || 1))
+    });
+  });
+
+  const machineCatalog = (machineRows || []).map(row => ({
+    code: String(row?.code || '').trim(),
+    name: String(row?.name || '').trim(),
+    archived: row?.is_active === false,
+    bom: Array.isArray(bomByMachineId.get(row.id)) ? bomByMachineId.get(row.id) : []
+  })).filter(row => row.code && row.name);
+
+  return {
+    partsCatalog,
+    suppliers,
+    machineCatalog
+  };
+};
+
+window.saveCatalogPartToSupabase = async function saveCatalogPartToSupabase(payload = {}) {
+  const companyId = requireBusinessCompanyId(payload?.companyId);
+  const sku = String(payload?.sku || '').trim();
+  const name = String(payload?.name || '').trim();
+  const originalSku = String(payload?.originalSku || sku).trim();
+  const selectedSuppliers = Array.isArray(payload?.selectedSuppliers) ? payload.selectedSuppliers.map(x => String(x || '').trim()).filter(Boolean) : [];
+  const pricesBySupplier = payload?.pricesBySupplier && typeof payload.pricesBySupplier === 'object' ? payload.pricesBySupplier : {};
+  const archived = payload?.archived === true;
+
+  if (!sku || !name) throw new Error('Część musi mieć sku i name.');
+
+  const { data: currentPart, error: currentPartError } = await window.sb
+    .from('parts')
+    .select('id, sku')
+    .eq('company_id', companyId)
+    .eq('sku', originalSku)
+    .maybeSingle();
+  if (currentPartError) throw currentPartError;
+
+  if (originalSku !== sku) {
+    const { data: duplicatePart, error: duplicatePartError } = await window.sb
+      .from('parts')
+      .select('id')
+      .eq('company_id', companyId)
+      .eq('sku', sku)
+      .maybeSingle();
+    if (duplicatePartError) throw duplicatePartError;
+    if (duplicatePart && duplicatePart.id !== currentPart?.id) {
+      throw new Error(`Część o ID "${sku}" już istnieje w bazie.`);
+    }
+  }
+
+  let savedPart = currentPart || null;
+  const partPayload = {
+    company_id: companyId,
+    sku,
+    name,
+    is_active: !archived,
+    warning_qty: payload?.yellowThreshold == null ? null : Math.max(0, Math.trunc(Number(payload.yellowThreshold) || 0)),
+    critical_qty: payload?.redThreshold == null ? null : Math.max(0, Math.trunc(Number(payload.redThreshold) || 0))
+  };
+
+  if (savedPart?.id) {
+    const { data, error } = await window.sb
+      .from('parts')
+      .update(partPayload)
+      .eq('id', savedPart.id)
+      .select('id, sku')
+      .maybeSingle();
+    if (error) throw error;
+    savedPart = data || { ...savedPart, sku };
+  } else {
+    const { data, error } = await window.sb
+      .from('parts')
+      .insert(partPayload)
+      .select('id, sku')
+      .maybeSingle();
+    if (error) throw error;
+    savedPart = data;
+  }
+
+  if (!savedPart?.id) throw new Error('Nie udało się zapisać części w Supabase.');
+
+  const supplierRows = await window.fetchCatalogSuppliers(companyId);
+  const supplierIdsByName = new Map((supplierRows || []).map(row => [String(row?.name || '').trim(), row?.id]).filter(entry => entry[0] && entry[1]));
+
+  const { error: deletePricesError } = await window.sb
+    .from('supplier_part_prices')
+    .delete()
+    .eq('part_id', savedPart.id);
+  if (deletePricesError) throw deletePricesError;
+
+  const pricePayload = selectedSuppliers
+    .map(nameKey => {
+      const supplierId = supplierIdsByName.get(nameKey);
+      if (!supplierId) return null;
+      return {
+        supplier_id: supplierId,
+        part_id: savedPart.id,
+        price: Math.max(0, Number(pricesBySupplier[nameKey]) || 0)
+      };
+    })
+    .filter(Boolean);
+
+  if (pricePayload.length) {
+    const { error: insertPricesError } = await window.sb
+      .from('supplier_part_prices')
+      .insert(pricePayload);
+    if (insertPricesError) throw insertPricesError;
+  }
+
+  return savedPart;
+};
+
+window.setCatalogPartArchivedInSupabase = async function setCatalogPartArchivedInSupabase(sku, archived, companyIdOverride) {
+  const companyId = requireBusinessCompanyId(companyIdOverride);
+  const normalizedSku = String(sku || '').trim();
+  if (!normalizedSku) throw new Error('Brak sku części.');
+
+  const { data, error } = await window.sb
+    .from('parts')
+    .update({ is_active: !archived })
+    .eq('company_id', companyId)
+    .eq('sku', normalizedSku)
+    .select('id, sku, is_active')
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+};
+
+window.createCatalogSupplierInSupabase = async function createCatalogSupplierInSupabase(name, companyIdOverride) {
+  const companyId = requireBusinessCompanyId(companyIdOverride);
+  const normalizedName = String(name || '').trim();
+  if (!normalizedName) throw new Error('Podaj nazwę dostawcy.');
+
+  const { data, error } = await window.sb
+    .from('suppliers')
+    .insert({ company_id: companyId, name: normalizedName, is_active: true })
+    .select('id, name, is_active')
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+};
+
+window.saveSupplierPricesToSupabase = async function saveSupplierPricesToSupabase(payload = {}) {
+  const companyId = requireBusinessCompanyId(payload?.companyId);
+  const supplierName = String(payload?.supplierName || '').trim();
+  const pricesBySku = payload?.pricesBySku && typeof payload.pricesBySku === 'object' ? payload.pricesBySku : {};
+  if (!supplierName) throw new Error('Brak nazwy dostawcy.');
+
+  const suppliersRows = await window.fetchCatalogSuppliers(companyId);
+  const supplierRow = (suppliersRows || []).find(row => String(row?.name || '').trim() === supplierName);
+  if (!supplierRow?.id) throw new Error('Nie znaleziono dostawcy w Supabase.');
+
+  const partsRows = await window.fetchCatalogParts(companyId);
+  const partIdsBySku = new Map((partsRows || []).map(row => [String(row?.sku || '').trim().toLowerCase(), row?.id]).filter(entry => entry[0] && entry[1]));
+
+  const { error: deletePricesError } = await window.sb
+    .from('supplier_part_prices')
+    .delete()
+    .eq('supplier_id', supplierRow.id);
+  if (deletePricesError) throw deletePricesError;
+
+  const insertPayload = Object.entries(pricesBySku)
+    .map(([sku, price]) => {
+      const partId = partIdsBySku.get(String(sku || '').trim().toLowerCase());
+      if (!partId) return null;
+      return {
+        supplier_id: supplierRow.id,
+        part_id: partId,
+        price: Math.max(0, Number(price) || 0)
+      };
+    })
+    .filter(Boolean);
+
+  if (insertPayload.length) {
+    const { error: insertPricesError } = await window.sb
+      .from('supplier_part_prices')
+      .insert(insertPayload);
+    if (insertPricesError) throw insertPricesError;
+  }
+
+  return supplierRow;
+};
+
+window.setCatalogSupplierArchivedInSupabase = async function setCatalogSupplierArchivedInSupabase(name, archived, companyIdOverride) {
+  const companyId = requireBusinessCompanyId(companyIdOverride);
+  const normalizedName = String(name || '').trim();
+  if (!normalizedName) throw new Error('Brak nazwy dostawcy.');
+
+  const { data, error } = await window.sb
+    .from('suppliers')
+    .update({ is_active: !archived })
+    .eq('company_id', companyId)
+    .eq('name', normalizedName)
+    .select('id, name, is_active')
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+};
+
+window.saveMachineDefinitionToSupabase = async function saveMachineDefinitionToSupabase(payload = {}) {
+  const companyId = requireBusinessCompanyId(payload?.companyId);
+  const code = String(payload?.code || '').trim();
+  const name = String(payload?.name || '').trim();
+  const originalCode = String(payload?.originalCode || code).trim();
+  const archived = payload?.archived === true;
+  const bom = Array.isArray(payload?.bom) ? payload.bom : [];
+  if (!code || !name) throw new Error('Maszyna musi mieć code i name.');
+
+  const { data: currentMachine, error: currentMachineError } = await window.sb
+    .from('machine_definitions')
+    .select('id, code')
+    .eq('company_id', companyId)
+    .eq('code', originalCode)
+    .maybeSingle();
+  if (currentMachineError) throw currentMachineError;
+
+  if (originalCode !== code) {
+    const { data: duplicateMachine, error: duplicateMachineError } = await window.sb
+      .from('machine_definitions')
+      .select('id')
+      .eq('company_id', companyId)
+      .eq('code', code)
+      .maybeSingle();
+    if (duplicateMachineError) throw duplicateMachineError;
+    if (duplicateMachine && duplicateMachine.id !== currentMachine?.id) {
+      throw new Error(`Maszyna o kodzie "${code}" już istnieje w bazie.`);
+    }
+  }
+
+  let savedMachine = currentMachine || null;
+  const machinePayload = {
+    company_id: companyId,
+    code,
+    name,
+    is_active: !archived
+  };
+
+  if (savedMachine?.id) {
+    const { data, error } = await window.sb
+      .from('machine_definitions')
+      .update(machinePayload)
+      .eq('id', savedMachine.id)
+      .select('id, code')
+      .maybeSingle();
+    if (error) throw error;
+    savedMachine = data || { ...savedMachine, code };
+  } else {
+    const { data, error } = await window.sb
+      .from('machine_definitions')
+      .insert(machinePayload)
+      .select('id, code')
+      .maybeSingle();
+    if (error) throw error;
+    savedMachine = data;
+  }
+
+  if (!savedMachine?.id) throw new Error('Nie udało się zapisać definicji maszyny.');
+
+  const partsRows = await window.fetchCatalogParts(companyId);
+  const partIdsBySku = new Map((partsRows || []).map(row => [String(row?.sku || '').trim().toLowerCase(), row?.id]).filter(entry => entry[0] && entry[1]));
+
+  const { error: deleteBomError } = await window.sb
+    .from('machine_bom_items')
+    .delete()
+    .eq('machine_definition_id', savedMachine.id);
+  if (deleteBomError) throw deleteBomError;
+
+  const bomPayload = bom.map(item => {
+    const sku = String(item?.sku || '').trim().toLowerCase();
+    const partId = partIdsBySku.get(sku);
+    if (!partId) throw new Error(`Nie znaleziono części BOM dla sku "${item?.sku || ''}".`);
+    return {
+      machine_definition_id: savedMachine.id,
+      part_id: partId,
+      qty: Math.max(1, Math.trunc(Number(item?.qty) || 1))
+    };
+  });
+
+  if (bomPayload.length) {
+    const { error: insertBomError } = await window.sb
+      .from('machine_bom_items')
+      .insert(bomPayload);
+    if (insertBomError) throw insertBomError;
+  }
+
+  return savedMachine;
+};
+
+window.setMachineArchivedInSupabase = async function setMachineArchivedInSupabase(code, archived, companyIdOverride) {
+  const companyId = requireBusinessCompanyId(companyIdOverride);
+  const normalizedCode = String(code || '').trim();
+  if (!normalizedCode) throw new Error('Brak kodu maszyny.');
+
+  const { data, error } = await window.sb
+    .from('machine_definitions')
+    .update({ is_active: !archived })
+    .eq('company_id', companyId)
+    .eq('code', normalizedCode)
+    .select('id, code, is_active')
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+};
+
+
+function normalizeBusinessNumber(value, fallback = 0) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function normalizeBusinessInt(value, fallback = 0) {
+  return Math.max(0, Math.trunc(normalizeBusinessNumber(value, fallback)));
+}
+
+function resolveRowDateISO(row = {}, fallback = '') {
+  const raw = String(
+    row?.date_in
+    || row?.dateISO
+    || row?.event_date
+    || row?.eventDate
+    || row?.received_at
+    || row?.created_at
+    || fallback
+    || ''
+  ).trim();
+  return raw ? raw.slice(0, 10) : '';
+}
+
+async function buildBusinessLookups(companyIdOverride) {
+  const companyId = requireBusinessCompanyId(companyIdOverride);
+  const [partsRows, suppliersRows, machineRows] = await Promise.all([
+    window.fetchCatalogParts(companyId),
+    window.fetchCatalogSuppliers(companyId),
+    window.fetchMachineDefinitions(companyId)
+  ]);
+
+  return {
+    companyId,
+    partsById: new Map((partsRows || []).map(row => [row?.id, row]).filter(entry => entry[0])),
+    partsBySku: new Map((partsRows || []).map(row => [String(row?.sku || '').trim().toLowerCase(), row]).filter(entry => entry[0] && entry[1])),
+    suppliersById: new Map((suppliersRows || []).map(row => [row?.id, row]).filter(entry => entry[0])),
+    suppliersByName: new Map((suppliersRows || []).map(row => [String(row?.name || '').trim(), row]).filter(entry => entry[0] && entry[1])),
+    machinesById: new Map((machineRows || []).map(row => [row?.id, row]).filter(entry => entry[0])),
+    machinesByCode: new Map((machineRows || []).map(row => [String(row?.code || '').trim(), row]).filter(entry => entry[0] && entry[1]))
+  };
+}
+
+window.fetchInventoryLotsRows = async function fetchInventoryLotsRows(companyIdOverride) {
+  const companyId = requireBusinessCompanyId(companyIdOverride);
+  const { data, error } = await window.sb
+    .from('inventory_lots')
+    .select('*')
+    .eq('company_id', companyId)
+    .order('date_in', { ascending: true, nullsFirst: false })
+    .order('id', { ascending: true });
+
+  if (error) throw error;
+  return Array.isArray(data) ? data : [];
+};
+
+window.fetchMachineStockRows = async function fetchMachineStockRows(companyIdOverride) {
+  const companyId = requireBusinessCompanyId(companyIdOverride);
+  const { data, error } = await window.sb
+    .from('machine_stock')
+    .select('*')
+    .eq('company_id', companyId)
+    .order('id', { ascending: true });
+
+  if (error) throw error;
+  return Array.isArray(data) ? data : [];
+};
+
+window.fetchHistoryEventRows = async function fetchHistoryEventRows(companyIdOverride) {
+  const companyId = requireBusinessCompanyId(companyIdOverride);
+  const { data, error } = await window.sb
+    .from('history_events')
+    .select('*')
+    .eq('company_id', companyId)
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false });
+
+  if (error) throw error;
+  return Array.isArray(data) ? data : [];
+};
+
+window.fetchOperationalStateFromSupabase = async function fetchOperationalStateFromSupabase(companyIdOverride) {
+  const lookups = await buildBusinessLookups(companyIdOverride);
+  const [lotRows, machineStockRows, historyRows] = await Promise.all([
+    window.fetchInventoryLotsRows(lookups.companyId),
+    window.fetchMachineStockRows(lookups.companyId),
+    window.fetchHistoryEventRows(lookups.companyId)
+  ]);
+
+  const lots = (lotRows || []).map(row => {
+    const part = lookups.partsById.get(row?.part_id) || null;
+    const supplier = lookups.suppliersById.get(row?.supplier_id) || null;
+    const sku = String(part?.sku || row?.sku || '').trim();
+    const name = String(part?.name || row?.name || '').trim();
+    if (!sku || !name) return null;
+    return {
+      id: row?.id,
+      sku,
+      name,
+      supplier: String(supplier?.name || row?.supplier_name || row?.supplier || '-').trim() || '-',
+      unitPrice: Math.max(0, normalizeBusinessNumber(row?.unit_price ?? row?.price ?? row?.unitPrice, 0)),
+      qty: normalizeBusinessInt(row?.qty, 0),
+      dateIn: resolveRowDateISO(row)
+    };
+  }).filter(Boolean);
+
+  const machinesStock = (machineStockRows || []).map(row => {
+    const machine = lookups.machinesById.get(row?.machine_definition_id) || null;
+    const code = String(machine?.code || row?.code || '').trim();
+    const name = String(machine?.name || row?.name || '').trim();
+    if (!code) return null;
+    return {
+      code,
+      name: name || code,
+      qty: normalizeBusinessInt(row?.qty, 0),
+      _rowId: row?.id ?? null,
+      _machineDefinitionId: row?.machine_definition_id ?? null
+    };
+  }).filter(Boolean);
+
+  const history = (historyRows || []).map(row => {
+    const payload = row?.payload && typeof row.payload === 'object' ? row.payload : {};
+    const type = String(row?.event_type || row?.type || payload?.type || '').trim().toLowerCase();
+    const dateISO = resolveRowDateISO(row, payload?.dateISO || payload?.date_iso || '');
+    const ts = Date.parse(String(row?.created_at || payload?.created_at || '').trim()) || Date.now();
+
+    if (type === 'delivery') {
+      return {
+        id: row?.id,
+        ts,
+        type: 'delivery',
+        dateISO,
+        supplier: String(payload?.supplier || '-').trim() || '-',
+        items: Array.isArray(payload?.items) ? payload.items.map(item => ({
+          sku: String(item?.sku || '').trim(),
+          name: String(item?.name || '').trim(),
+          qty: normalizeBusinessInt(item?.qty, 0),
+          price: Math.max(0, normalizeBusinessNumber(item?.price ?? item?.unitPrice, 0))
+        })).filter(item => item.sku) : []
+      };
+    }
+
+    if (type === 'build') {
+      return {
+        id: row?.id,
+        ts,
+        type: 'build',
+        dateISO,
+        items: Array.isArray(payload?.items) ? payload.items : []
+      };
+    }
+
+    if (type === 'adjustment') {
+      const items = Array.isArray(payload?.items)
+        ? payload.items
+        : (Array.isArray(payload?.details?.changes) ? payload.details.changes : []);
+      return {
+        id: row?.id,
+        ts,
+        type: 'adjustment',
+        dateISO,
+        partsChanged: normalizeBusinessInt(payload?.partsChanged ?? items.length, items.length),
+        items
+      };
+    }
+
+    return null;
+  }).filter(Boolean);
+
+  return { lots, machinesStock, history };
+};
+
+async function persistInventoryLotsSnapshot(nextLots = [], companyIdOverride) {
+  const lookups = await buildBusinessLookups(companyIdOverride);
+  const currentRows = await window.fetchInventoryLotsRows(lookups.companyId);
+  const currentIds = new Set((currentRows || []).map(row => row?.id).filter(id => id != null));
+  const nextIds = new Set((nextLots || []).map(lot => lot?.id).filter(id => id != null));
+
+  const toDeleteIds = Array.from(currentIds).filter(id => !nextIds.has(id));
+  if (toDeleteIds.length) {
+    const { error } = await window.sb
+      .from('inventory_lots')
+      .delete()
+      .in('id', toDeleteIds);
+    if (error) throw error;
+  }
+
+  for (const lot of (nextLots || [])) {
+    const sku = String(lot?.sku || '').trim().toLowerCase();
+    const part = lookups.partsBySku.get(sku);
+    if (!part?.id) throw new Error(`Nie znaleziono części dla partii ${lot?.sku || '—'}.`);
+
+    const supplierName = String(lot?.supplier || '').trim();
+    const supplier = supplierName ? lookups.suppliersByName.get(supplierName) || null : null;
+    const payload = {
+      company_id: lookups.companyId,
+      part_id: part.id,
+      supplier_id: supplier?.id || null,
+      qty: normalizeBusinessInt(lot?.qty, 0),
+      unit_price: Math.max(0, normalizeBusinessNumber(lot?.unitPrice, 0)),
+      date_in: String(lot?.dateIn || '').trim() || null
+    };
+
+    if (lot?.id != null && currentIds.has(lot.id)) {
+      const { error } = await window.sb
+        .from('inventory_lots')
+        .update(payload)
+        .eq('id', lot.id);
+      if (error) throw error;
+    } else {
+      const { error } = await window.sb
+        .from('inventory_lots')
+        .insert(payload);
+      if (error) throw error;
+    }
+  }
+}
+
+async function persistMachineStockSnapshot(nextMachineStock = [], companyIdOverride) {
+  const lookups = await buildBusinessLookups(companyIdOverride);
+  const currentRows = await window.fetchMachineStockRows(lookups.companyId);
+  const currentById = new Map((currentRows || []).map(row => [row?.id, row]).filter(entry => entry[0] != null));
+  const currentByMachineId = new Map((currentRows || []).map(row => [row?.machine_definition_id, row]).filter(entry => entry[0] != null));
+  const keptIds = new Set();
+
+  for (const item of (nextMachineStock || [])) {
+    const code = String(item?.code || '').trim();
+    const machine = lookups.machinesByCode.get(code);
+    if (!machine?.id) throw new Error(`Nie znaleziono definicji maszyny dla kodu ${code || '—'}.`);
+
+    const payload = {
+      company_id: lookups.companyId,
+      machine_definition_id: machine.id,
+      qty: normalizeBusinessInt(item?.qty, 0)
+    };
+
+    const rowId = item?._rowId;
+    const existingRow = (rowId != null && currentById.has(rowId))
+      ? currentById.get(rowId)
+      : currentByMachineId.get(machine.id);
+
+    if (existingRow?.id != null) {
+      keptIds.add(existingRow.id);
+      const { error } = await window.sb
+        .from('machine_stock')
+        .update(payload)
+        .eq('id', existingRow.id);
+      if (error) throw error;
+    } else {
+      const { error } = await window.sb
+        .from('machine_stock')
+        .insert(payload);
+      if (error) throw error;
+    }
+  }
+
+  const toDeleteIds = (currentRows || [])
+    .map(row => row?.id)
+    .filter(id => id != null && !keptIds.has(id) && !(nextMachineStock || []).some(item => item?._rowId === id));
+
+  if (toDeleteIds.length) {
+    const { error } = await window.sb
+      .from('machine_stock')
+      .delete()
+      .in('id', toDeleteIds);
+    if (error) throw error;
+  }
+}
+
+async function insertHistoryEventRow(historyEvent = {}, companyIdOverride) {
+  const companyId = requireBusinessCompanyId(companyIdOverride);
+  const payload = {
+    company_id: companyId,
+    event_type: String(historyEvent?.type || '').trim().toLowerCase(),
+    date_iso: String(historyEvent?.dateISO || '').trim() || null,
+    payload: historyEvent && typeof historyEvent === 'object'
+      ? JSON.parse(JSON.stringify({ ...historyEvent, id: undefined, ts: undefined }))
+      : {}
+  };
+
+  if (!payload.event_type) throw new Error('Brak typu eventu historii.');
+
+  const { data, error } = await window.sb
+    .from('history_events')
+    .insert(payload)
+    .select('*')
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+
+window.saveDeliveryToSupabase = async function saveDeliveryToSupabase(payload = {}) {
+  const lookups = await buildBusinessLookups(payload?.companyId);
+  const supplierName = String(payload?.supplier || '').trim();
+  const supplier = supplierName ? lookups.suppliersByName.get(supplierName) || null : null;
+  const items = Array.isArray(payload?.items) ? payload.items : [];
+
+  if (!supplierName) throw new Error('Brak dostawcy dla dostawy.');
+  if (!items.length) throw new Error('Brak pozycji dostawy do zapisania.');
+
+  const insertPayload = items.map(item => {
+    const sku = String(item?.sku || '').trim().toLowerCase();
+    const part = lookups.partsBySku.get(sku);
+    if (!part?.id) throw new Error(`Nie znaleziono części ${item?.sku || '—'} w Supabase.`);
+    return {
+      company_id: lookups.companyId,
+      part_id: part.id,
+      supplier_id: supplier?.id || null,
+      qty: normalizeBusinessInt(item?.qty, 0),
+      unit_price: Math.max(0, normalizeBusinessNumber(item?.price, 0)),
+      date_in: String(payload?.dateISO || '').trim() || null
+    };
+  });
+
+  const { error } = await window.sb
+    .from('inventory_lots')
+    .insert(insertPayload);
+  if (error) throw error;
+
+  await insertHistoryEventRow({
+    type: 'delivery',
+    dateISO: String(payload?.dateISO || '').trim(),
+    supplier: supplierName,
+    items: items.map(item => ({
+      sku: String(item?.sku || '').trim(),
+      name: String(item?.name || '').trim(),
+      qty: normalizeBusinessInt(item?.qty, 0),
+      price: Math.max(0, normalizeBusinessNumber(item?.price, 0))
+    }))
+  }, lookups.companyId);
+};
+
+window.saveBuildToSupabase = async function saveBuildToSupabase(payload = {}) {
+  const companyId = requireBusinessCompanyId(payload?.companyId);
+  await persistInventoryLotsSnapshot(Array.isArray(payload?.nextLots) ? payload.nextLots : [], companyId);
+  await persistMachineStockSnapshot(Array.isArray(payload?.nextMachineStock) ? payload.nextMachineStock : [], companyId);
+  await insertHistoryEventRow(payload?.historyEvent || {
+    type: 'build',
+    dateISO: String(payload?.buildISO || '').trim(),
+    items: []
+  }, companyId);
+};
+
+window.saveStockAdjustmentToSupabase = async function saveStockAdjustmentToSupabase(payload = {}) {
+  const companyId = requireBusinessCompanyId(payload?.companyId);
+  await persistInventoryLotsSnapshot(Array.isArray(payload?.nextLots) ? payload.nextLots : [], companyId);
+  await insertHistoryEventRow(payload?.historyEvent || {
+    type: 'adjustment',
+    dateISO: '',
+    items: []
+  }, companyId);
+};
+
 window.testSupabaseConnection = async function testSupabaseConnection() {
   const result = await window.refreshAuthContext();
   console.log("SUPABASE TEST RESULT:", result);

@@ -1,5 +1,112 @@
 // === INIT & BINDINGS ===
 
+async function loadCatalogsFromSupabaseIntoState(options = {}) {
+  const silent = options?.silent === true;
+  const preserveUi = options?.preserveUi !== false;
+
+  if (!window.fetchCatalogStateFromSupabase) {
+    throw new Error('Brak helpera katalogów Supabase.');
+  }
+
+  const uiSnapshot = preserveUi ? {
+    stockEditMode: !!state.ui?.stockEditMode,
+    pendingStockAdjustments: { ...(state.ui?.pendingStockAdjustments || {}) },
+    showArchivedPartsInWarehouse: shouldShowArchivedPartsInWarehouse(),
+    showArchivedMachinesInStock: shouldShowArchivedMachinesInStock()
+  } : null;
+
+  const catalogState = await window.fetchCatalogStateFromSupabase();
+  applyCatalogState(catalogState);
+
+  if (uiSnapshot) {
+    ensureUiState();
+    state.ui.stockEditMode = uiSnapshot.stockEditMode;
+    state.ui.pendingStockAdjustments = uiSnapshot.pendingStockAdjustments;
+    state.ui.showArchivedPartsInWarehouse = uiSnapshot.showArchivedPartsInWarehouse;
+    state.ui.showArchivedMachinesInStock = uiSnapshot.showArchivedMachinesInStock;
+  }
+
+  save();
+
+  if (!silent) {
+    renderWarehouse();
+    renderAllSuppliers();
+    renderMachinesStock();
+    refreshCatalogsUI();
+    renderDelivery();
+    renderBuild();
+  }
+
+  return catalogState;
+}
+
+async function loadOperationalStateFromSupabaseIntoState(options = {}) {
+  const silent = options?.silent === true;
+  const preserveUi = options?.preserveUi !== false;
+
+  if (!window.fetchOperationalStateFromSupabase) {
+    throw new Error('Brak helpera operacyjnych danych Supabase.');
+  }
+
+  const uiSnapshot = preserveUi ? {
+    stockEditMode: !!state.ui?.stockEditMode,
+    pendingStockAdjustments: { ...(state.ui?.pendingStockAdjustments || {}) },
+    showArchivedPartsInWarehouse: shouldShowArchivedPartsInWarehouse(),
+    showArchivedMachinesInStock: shouldShowArchivedMachinesInStock()
+  } : null;
+
+  const operationalState = await window.fetchOperationalStateFromSupabase();
+  applyOperationalState(operationalState);
+
+  if (uiSnapshot) {
+    ensureUiState();
+    state.ui.stockEditMode = uiSnapshot.stockEditMode;
+    state.ui.pendingStockAdjustments = uiSnapshot.pendingStockAdjustments;
+    state.ui.showArchivedPartsInWarehouse = uiSnapshot.showArchivedPartsInWarehouse;
+    state.ui.showArchivedMachinesInStock = uiSnapshot.showArchivedMachinesInStock;
+  }
+
+  save();
+
+  if (!silent) {
+    renderWarehouse();
+    renderMachinesStock();
+    renderHistory();
+    renderDelivery();
+    renderBuild();
+  }
+
+  return operationalState;
+}
+
+window.loadOperationalStateFromSupabaseIntoState = loadOperationalStateFromSupabaseIntoState;
+
+function collectSupplierPricesFromPanel(panelId, allowedSupplierNames = []) {
+  const allowed = new Set((allowedSupplierNames || []).map(name => normalize(name)).filter(Boolean));
+  const panel = document.getElementById(panelId);
+  const inputs = panel?.querySelectorAll('input[data-sup]') || [];
+  const result = {};
+
+  inputs.forEach(inp => {
+    const supplierName = normalize(inp.getAttribute('data-sup'));
+    if (!supplierName) return;
+    if (allowed.size && !allowed.has(supplierName)) return;
+    result[supplierName] = safeFloat(inp.value);
+  });
+
+  return result;
+}
+
+function collectSupplierPriceMapBySku(supplierName) {
+  const supplier = state.suppliers.get(normalize(supplierName));
+  const prices = supplier?.prices instanceof Map ? supplier.prices : new Map();
+  const result = {};
+  prices.forEach((price, sku) => {
+    result[sku] = safeFloat(price);
+  });
+  return result;
+}
+
 // Strict integer parser for quantities
 function strictParseQtyInt(raw) {
   const s = String(raw ?? "").trim();
@@ -104,8 +211,13 @@ function initStockEditMode() {
     cancelStockEditMode();
   });
 
-  document.getElementById("stockEditSaveBtn")?.addEventListener("click", () => {
-    commitStockAdjustments();
+  document.getElementById("stockEditSaveBtn")?.addEventListener("click", async () => {
+    try {
+      await commitStockAdjustments();
+    } catch (err) {
+      console.error(err);
+      toast("Błąd systemu", "Nie udało się zapisać korekt stanów.", "error");
+    }
   });
 
   document.addEventListener("change", (e) => {
@@ -1471,6 +1583,18 @@ async function init() {
   }
   
   load();
+  try {
+    await loadCatalogsFromSupabaseIntoState({ silent: true });
+  } catch (err) {
+    console.error('Błąd ładowania katalogów z Supabase:', err);
+    toast('Katalogi nie zostały pobrane', err?.message || 'Nie udało się wczytać katalogów z Supabase.', 'warning');
+  }
+  try {
+    await loadOperationalStateFromSupabaseIntoState({ silent: true });
+  } catch (err) {
+    console.error('Błąd ładowania danych operacyjnych z Supabase:', err);
+    toast('Dane operacyjne nie zostały pobrane', err?.message || 'Nie udało się wczytać operacyjnych danych magazynowych z Supabase.', 'warning');
+  }
   bindTabs();
   bindTabModal();
   bindMachineEditorModal();
@@ -1693,8 +1817,8 @@ document.getElementById("addDeliveryItemBtn")?.addEventListener("click", () => {
   }
 });
 
-document.getElementById("finalizeDeliveryBtn")?.addEventListener("click", () => {
-  try { finalizeDelivery(); }
+document.getElementById("finalizeDeliveryBtn")?.addEventListener("click", async () => {
+  try { await finalizeDelivery(); }
   catch (e) { 
     console.error(e); 
     toast("Błąd systemu", "Nie udało się zatwierdzić dostawy. Sprawdź konsolę (F12) po szczegóły.", "error"); 
@@ -1765,7 +1889,7 @@ window.removeBuildItem = (id) => {
   renderBuild();
 };
 
-document.getElementById("finalizeBuildBtn")?.addEventListener("click", () => {
+document.getElementById("finalizeBuildBtn")?.addEventListener("click", async () => {
   try {
     const mode = document.getElementById("consumeMode")?.value;
     if (mode === 'manual') {
@@ -1795,9 +1919,9 @@ document.getElementById("finalizeBuildBtn")?.addEventListener("click", () => {
         }
       });
 
-      if (!error) finalizeBuild(manualAlloc);
+      if (!error) await finalizeBuild(manualAlloc);
     } else {
-      finalizeBuild(null);
+      await finalizeBuild(null);
     }
   } catch (e) {
     console.error(e);
@@ -1818,7 +1942,10 @@ document.getElementById("consumeMode")?.addEventListener("change", (e) => {
 });
 
 // Catalog events
-document.getElementById("addPartBtn")?.addEventListener("click", () => {
+document.getElementById("addPartBtn")?.addEventListener("click", async () => {
+  const btn = document.getElementById("addPartBtn");
+  if (btn?.dataset.busy === "1") return;
+
   const sku = document.getElementById("partSkuInput")?.value ?? "";
   const name = document.getElementById("partNameInput")?.value ?? "";
 
@@ -1838,32 +1965,60 @@ document.getElementById("addPartBtn")?.addEventListener("click", () => {
     return;
   }
 
-  const res = upsertPart(sku, name, selectedSups, thresholds);
-  toast(res.success ? "Zapisano" : "Błąd walidacji", res.msg, res.success ? "success" : "warning");
+  if (!/^[a-zA-Z0-9_-]+$/.test(normalizedSku)) {
+    toast("Błąd walidacji", "ID może zawierać tylko litery, cyfry, myślniki i podkreślenia (bez spacji).", "warning");
+    skuInput?.focus?.();
+    return;
+  }
+  if (normalizedSku.length > 50) {
+    toast("Błąd walidacji", "ID nie może być dłuższe niż 50 znaków.", "warning");
+    skuInput?.focus?.();
+    return;
+  }
+  if (normalize(name).length > 200) {
+    toast("Błąd walidacji", "Typ nie może być dłuższy niż 200 znaków.", "warning");
+    return;
+  }
 
-  if (res.success) {
-    const k = skuKey(sku);
-    const panel = document.getElementById("newPartSupplierPrices");
-    const inputs = panel?.querySelectorAll('input[data-sup]') || [];
-    inputs.forEach(inp => {
-      const sup = inp.getAttribute("data-sup");
-      if (sup) updateSupplierPrice(sup, sku, inp.value);
+  try {
+    if (btn) {
+      btn.dataset.busy = "1";
+      btn.disabled = true;
+    }
+
+    await window.saveCatalogPartToSupabase?.({
+      sku: normalize(sku),
+      name: normalize(name),
+      yellowThreshold: thresholds.yellowThreshold,
+      redThreshold: thresholds.redThreshold,
+      selectedSuppliers: selectedSups,
+      pricesBySupplier: collectSupplierPricesFromPanel("newPartSupplierPrices", selectedSups),
+      archived: false
     });
+
+    await loadCatalogsFromSupabaseIntoState({ silent: false });
 
     const skuEl = document.getElementById("partSkuInput");
     const nameEl = document.getElementById("partNameInput");
     if (skuEl) skuEl.value = "";
     if (nameEl) nameEl.value = "";
-
     if (typeof comboMultiClear === "function") comboMultiClear(box);
 
-    refreshCatalogsUI();
     syncNewPartSupplierPricesUI();
     closeNewPartPanel({ clear: true });
+    toast("Zapisano", "Zapisano część w bazie.", "success");
+  } catch (err) {
+    console.error("Błąd zapisu części do Supabase:", err);
+    toast("Nie zapisano części", err?.message || "Nie udało się zapisać części w Supabase.", "error");
+  } finally {
+    if (btn) {
+      btn.dataset.busy = "0";
+      btn.disabled = false;
+    }
   }
 });
 
-window.togglePartArchive = (sku) => {
+window.togglePartArchive = async (sku) => {
   const part = state.partsCatalog.get(skuKey(sku));
   if (!part) return;
 
@@ -1884,23 +2039,60 @@ Rekord wróci do nowych operacji. Historia pozostanie bez zmian.`;
     return;
   }
 
-  refreshCatalogsUI();
-  renderWarehouse();
-  renderDelivery();
-  renderBuild();
-  renderMachinesStock();
-  toast(willArchive ? "Zarchiwizowano część" : "Przywrócono część", result.msg, "success");
+  try {
+    await window.setCatalogPartArchivedInSupabase?.(part.sku, willArchive);
+    await loadCatalogsFromSupabaseIntoState({ silent: false });
+    toast(willArchive ? "Zarchiwizowano część" : "Przywrócono część", result.msg, "success");
+  } catch (err) {
+    console.error("Błąd archiwizacji części w Supabase:", err);
+    part.archived = !willArchive;
+    save();
+    toast(willArchive ? "Nie zarchiwizowano części" : "Nie przywrócono części", err?.message || "Nie udało się zapisać archiwizacji części w Supabase.", "error");
+  }
 };
 
-document.getElementById("addSupplierBtn")?.addEventListener("click", () => {
-  const name = document.getElementById("supplierNameInput")?.value ?? "";
-  const added = addSupplier(name);
-  if (added) {
-    document.getElementById("supplierNameInput").value = "";
+document.getElementById("addSupplierBtn")?.addEventListener("click", async () => {
+  const btn = document.getElementById("addSupplierBtn");
+  if (btn?.dataset.busy === "1") return;
+
+  const nameInput = document.getElementById("supplierNameInput");
+  const name = nameInput?.value ?? "";
+  const normalizedName = normalize(name);
+
+  if (!normalizedName) {
+    toast("Brak nazwy", "Podaj nazwę dostawcy.", "warning");
+    return;
+  }
+  if (normalizedName.length > 100) {
+    toast("Za długa nazwa", "Nazwa dostawcy nie może przekraczać 100 znaków.", "warning");
+    return;
+  }
+  if (state.suppliers.has(normalizedName)) {
+    toast("Dostawca już istnieje", `Dostawca "${normalizedName}" jest już w bazie.`, "warning");
+    return;
+  }
+
+  try {
+    if (btn) {
+      btn.dataset.busy = "1";
+      btn.disabled = true;
+    }
+    await window.createCatalogSupplierInSupabase?.(normalizedName);
+    await loadCatalogsFromSupabaseIntoState({ silent: false });
+    if (nameInput) nameInput.value = "";
+    toast("Dodano dostawcę", `"${normalizedName}" został dodany do bazy.`, "success");
+  } catch (err) {
+    console.error("Błąd dodawania dostawcy do Supabase:", err);
+    toast("Nie utworzono dostawcy", err?.message || "Nie udało się dodać dostawcy w Supabase.", "error");
+  } finally {
+    if (btn) {
+      btn.dataset.busy = "0";
+      btn.disabled = false;
+    }
   }
 });
 
-window.toggleSupplierArchive = (name) => {
+window.toggleSupplierArchive = async (name) => {
   const supplier = state.suppliers.get(normalize(name));
   if (!supplier) return;
 
@@ -1921,10 +2113,16 @@ Rekord wróci do nowych operacji. Historia pozostanie bez zmian.`;
     return;
   }
 
-  renderAllSuppliers();
-  refreshCatalogsUI();
-  renderDelivery();
-  toast(willArchive ? "Zarchiwizowano dostawcę" : "Przywrócono dostawcę", result.msg, "success");
+  try {
+    await window.setCatalogSupplierArchivedInSupabase?.(name, willArchive);
+    await loadCatalogsFromSupabaseIntoState({ silent: false });
+    toast(willArchive ? "Zarchiwizowano dostawcę" : "Przywrócono dostawcę", result.msg, "success");
+  } catch (err) {
+    console.error("Błąd archiwizacji dostawcy w Supabase:", err);
+    supplier.archived = !willArchive;
+    save();
+    toast(willArchive ? "Nie zarchiwizowano dostawcy" : "Nie przywrócono dostawcy", err?.message || "Nie udało się zapisać archiwizacji dostawcy w Supabase.", "error");
+  }
 };
 
 // === EDITORS ===
@@ -2067,7 +2265,7 @@ function startNewMachineFlow() {
 
 document.getElementById("openMachineModalBtn")?.addEventListener("click", startNewMachineFlow);
 
-window.toggleMachineArchive = (code) => {
+window.toggleMachineArchive = async (code) => {
   const machine = state.machineCatalog.find(m => m.code === code);
   const name = machine?.name || code;
   if (!machine) return;
@@ -2089,10 +2287,16 @@ Rekord wróci do nowych operacji. Historia pozostanie bez zmian.`;
     return;
   }
 
-  refreshCatalogsUI();
-  renderBuild();
-  renderMachinesStock();
-  toast(willArchive ? "Zarchiwizowano maszynę" : "Przywrócono maszynę", result.msg, "success");
+  try {
+    await window.setMachineArchivedInSupabase?.(code, willArchive);
+    await loadCatalogsFromSupabaseIntoState({ silent: false });
+    toast(willArchive ? "Zarchiwizowano maszynę" : "Przywrócono maszynę", result.msg, "success");
+  } catch (err) {
+    console.error("Błąd archiwizacji maszyny w Supabase:", err);
+    machine.archived = !willArchive;
+    save();
+    toast(willArchive ? "Nie zarchiwizowano maszyny" : "Nie przywrócono maszyny", err?.message || "Nie udało się zapisać archiwizacji maszyny w Supabase.", "error");
+  }
 };
 
 window.openSupplierEditor = (name) => {
@@ -2148,14 +2352,35 @@ document.getElementById("supplierEditorSetPriceBtn")?.addEventListener("click", 
   toast("Zapisano cenę", `Cena dla wybranej części została zaktualizowana.`, "success");
 });
 
-document.getElementById("supplierEditorSaveBtn")?.addEventListener("click", () => {
-  closeSupplierEditorModal();
-  editingSup = null;
-  editingSupSnapshot = null;
-  unsavedChanges.clear("supplierEditor");
-  renderAllSuppliers();
-  refreshCatalogsUI();
-  toast("Zapisano zmiany", "Cennik dostawcy został zaktualizowany.", "success");
+document.getElementById("supplierEditorSaveBtn")?.addEventListener("click", async () => {
+  const btn = document.getElementById("supplierEditorSaveBtn");
+  if (btn?.dataset.busy === "1") return;
+  if (!editingSup) return;
+
+  try {
+    if (btn) {
+      btn.dataset.busy = "1";
+      btn.disabled = true;
+    }
+    await window.saveSupplierPricesToSupabase?.({
+      supplierName: editingSup,
+      pricesBySku: collectSupplierPriceMapBySku(editingSup)
+    });
+    await loadCatalogsFromSupabaseIntoState({ silent: false });
+    closeSupplierEditorModal();
+    editingSup = null;
+    editingSupSnapshot = null;
+    unsavedChanges.clear("supplierEditor");
+    toast("Zapisano zmiany", "Cennik dostawcy został zaktualizowany.", "success");
+  } catch (err) {
+    console.error("Błąd zapisu cennika dostawcy do Supabase:", err);
+    toast("Nie zapisano cennika", err?.message || "Nie udało się zapisać cennika dostawcy w Supabase.", "error");
+  } finally {
+    if (btn) {
+      btn.dataset.busy = "0";
+      btn.disabled = false;
+    }
+  }
 });
 
 document.getElementById("supplierEditorCancelBtn")?.addEventListener("click", () => {
@@ -2328,7 +2553,10 @@ window.removeBomItem = (idx) => {
   renderBomTable();
 };
 
-document.getElementById("machineEditorSaveBtn")?.addEventListener("click", () => {
+document.getElementById("machineEditorSaveBtn")?.addEventListener("click", async () => {
+  const btn = document.getElementById("machineEditorSaveBtn");
+  if (btn?.dataset.busy === "1") return;
+
   const draft = ensureEditingMachineDraft();
 
   const codeInput = document.getElementById("machineCodeInput");
@@ -2361,35 +2589,42 @@ document.getElementById("machineEditorSaveBtn")?.addEventListener("click", () =>
   draft.code = code;
   draft.name = name;
 
-  if (editingMachineIsNew) {
-    state.machineCatalog.push({
+  try {
+    if (btn) {
+      btn.dataset.busy = "1";
+      btn.disabled = true;
+    }
+
+    await window.saveMachineDefinitionToSupabase?.({
+      originalCode: editingMachineOriginalCode || code,
       code,
       name,
-      archived: false,
+      archived: editingMachineIsNew ? false : !!state.machineCatalog.find(m => m.code === (editingMachineOriginalCode || code))?.archived,
       bom: draft.bom.map(b => ({ sku: b.sku, qty: safeInt(b.qty) }))
     });
-    editingMachineIsNew = false;
-    toast("Dodano maszynę", `"${name}" została dodana do katalogu.`, "success");
-  } else {
-    const idx = state.machineCatalog.findIndex(m => m.code === (editingMachineOriginalCode || code));
-    if (idx >= 0) {
-      state.machineCatalog[idx] = {
-        code,
-        name,
-        archived: !!state.machineCatalog[idx]?.archived,
-        bom: draft.bom.map(b => ({ sku: b.sku, qty: safeInt(b.qty) }))
-      };
-    }
-    toast("Zapisano zmiany", `BOM maszyny "${name}" został zaktualizowany.`, "success");
-  }
 
-  unsavedChanges.clear("machineEditor");
-  save();
-  closeMachineEditorModal();
-  editingMachine = null;
-  editingMachineSnapshot = null;
-  editingMachineOriginalCode = null;
-  refreshCatalogsUI();
+    await loadCatalogsFromSupabaseIntoState({ silent: false });
+
+    const successMsg = editingMachineIsNew
+      ? `"${name}" została dodana do katalogu.`
+      : `BOM maszyny "${name}" został zaktualizowany.`;
+
+    unsavedChanges.clear("machineEditor");
+    closeMachineEditorModal();
+    editingMachine = null;
+    editingMachineSnapshot = null;
+    editingMachineOriginalCode = null;
+    editingMachineIsNew = false;
+    toast("Zapisano zmiany", successMsg, "success");
+  } catch (err) {
+    console.error("Błąd zapisu maszyny do Supabase:", err);
+    toast("Nie zapisano maszyny", err?.message || "Nie udało się zapisać definicji maszyny w Supabase.", "error");
+  } finally {
+    if (btn) {
+      btn.dataset.busy = "0";
+      btn.disabled = false;
+    }
+  }
 });
 
 document.getElementById("machineEditorCancelBtn")?.addEventListener("click", () => {
@@ -2592,7 +2827,10 @@ window.startEditPart = (sku) => {
   openPartEditorModal();
 };
 
-function saveEditPart() {
+async function saveEditPart() {
+  const btn = document.getElementById("saveEditPartBtn");
+  if (btn?.dataset.busy === "1") return;
+
   const skuInput = document.getElementById("partSkuInput");
   const nameInput = document.getElementById("partNameInput");
   const editSkuInput = document.getElementById("editPartSkuInput");
@@ -2624,80 +2862,44 @@ function saveEditPart() {
 
   const originalPart = state.partsCatalog.get(originalK);
   const originalArchived = !!originalPart?.archived;
-
-  state.partsCatalog.delete(originalK);
-  state.partsCatalog.set(k, {
-    sku,
-    name,
-    yellowThreshold: thresholds.yellowThreshold,
-    redThreshold: thresholds.redThreshold,
-    archived: originalArchived
-  });
-
-  state.lots.forEach(lot => {
-    if (skuKey(lot.sku) === originalK) {
-      lot.sku = sku;
-      lot.name = name;
-    }
-  });
-
-  state.currentDelivery.items.forEach(item => {
-    if (skuKey(item.sku) === originalK) {
-      item.sku = sku;
-      item.name = name;
-    }
-  });
-
-  state.machineCatalog.forEach(machine => {
-    if (!Array.isArray(machine?.bom)) return;
-    machine.bom.forEach(item => {
-      if (skuKey(item?.sku) === originalK) {
-        item.sku = sku;
-      }
-    });
-  });
-
-  state.currentBuild.items.forEach(item => {
-    const bomSnapshot = Array.isArray(item?.bomSnapshot) ? item.bomSnapshot : [];
-    bomSnapshot.forEach(bomItem => {
-      if (skuKey(bomItem?.sku) === originalK) {
-        bomItem.sku = sku;
-        bomItem.name = name;
-      }
-    });
-  });
-
-  updateHistoryPartReferences(originalK, { sku, name });
-
   const editChecklist = document.getElementById("editPartSuppliersChecklist");
   const selectedSups = (typeof comboMultiGetSelected === "function") ? comboMultiGetSelected(editChecklist) : [];
 
-  for (const sup of state.suppliers.values()) {
-    sup.prices.delete(originalK);
-  }
-
-  const panel = document.getElementById("editPartSupplierPrices");
-  const inputs = panel?.querySelectorAll('input[data-sup]') || [];
-  inputs.forEach(inp => {
-    const sup = inp.getAttribute("data-sup");
-    if (sup && selectedSups.includes(sup)) {
-      const supData = state.suppliers.get(sup);
-      if (supData) supData.prices.set(k, safeFloat(inp.value));
+  try {
+    if (btn) {
+      btn.dataset.busy = "1";
+      btn.disabled = true;
     }
-  });
 
-  currentEditPartKey = k;
-  if (editSkuInput) editSkuInput.value = sku;
+    await window.saveCatalogPartToSupabase?.({
+      originalSku,
+      sku,
+      name,
+      yellowThreshold: thresholds.yellowThreshold,
+      redThreshold: thresholds.redThreshold,
+      selectedSuppliers: selectedSups,
+      pricesBySupplier: collectSupplierPricesFromPanel("editPartSupplierPrices", selectedSups),
+      archived: originalArchived
+    });
 
-  save();
-  refreshCatalogsUI();
-  renderWarehouse();
-  renderDelivery();
-  renderBuild();
-  renderMachinesStock();
-  unsavedChanges.clear("partEditor");
-  closePartEditorModal();
-  toast("Zapisano zmiany", `Część "${sku}" została zaktualizowana.`, "success");
+    applyPartNameChangeAcrossOperationalState(sku, name);
+    currentEditPartKey = k;
+    if (editSkuInput) editSkuInput.value = sku;
+
+    save();
+    await loadCatalogsFromSupabaseIntoState({ silent: false });
+    unsavedChanges.clear("partEditor");
+    closePartEditorModal();
+    toast("Zapisano zmiany", `Część "${sku}" została zaktualizowana.`, "success");
+  } catch (err) {
+    console.error("Błąd zapisu części do Supabase:", err);
+    toast("Nie zapisano części", err?.message || "Nie udało się zapisać zmian części w Supabase.", "error");
+  } finally {
+    if (btn) {
+      btn.dataset.busy = "0";
+      btn.disabled = false;
+    }
+  }
 }
 
 function cancelEditPart() {

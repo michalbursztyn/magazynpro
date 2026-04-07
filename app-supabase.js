@@ -449,6 +449,40 @@ function ensureExpectedUpdatedAt(expectedUpdatedAt, recordLabel) {
   return normalized;
 }
 
+
+function normalizeNullableExpectedUpdatedAt(expectedUpdatedAt) {
+  const normalized = String(expectedUpdatedAt || '').trim();
+  return normalized || null;
+}
+
+function getSupplierIdByNameFromCatalogRows(rows, supplierName) {
+  const normalizedName = String(supplierName || '').trim();
+  if (!normalizedName) {
+    throw new Error('Brakuje nazwy dostawcy do mapowania supplier_id.');
+  }
+
+  const row = (Array.isArray(rows) ? rows : []).find(item => String(item?.name || '').trim() === normalizedName);
+  if (!row?.id) {
+    throw new Error(`Nie znaleziono supplier_id dla dostawcy "${normalizedName}".`);
+  }
+
+  return row.id;
+}
+
+function getPartIdBySkuFromCatalogRows(rows, sku) {
+  const normalizedSku = String(sku || '').trim();
+  if (!normalizedSku) {
+    throw new Error('Brakuje sku części do mapowania part_id.');
+  }
+
+  const row = (Array.isArray(rows) ? rows : []).find(item => String(item?.sku || '').trim().toLowerCase() === normalizedSku.toLowerCase());
+  if (!row?.id) {
+    throw new Error(`Nie znaleziono part_id dla części o sku "${normalizedSku}".`);
+  }
+
+  return row.id;
+}
+
 window.fetchCatalogParts = async function fetchCatalogParts(companyIdOverride) {
   const companyId = requireBusinessCompanyId(companyIdOverride);
   const { data, error } = await window.sb
@@ -606,97 +640,34 @@ window.saveCatalogPartToSupabase = async function saveCatalogPartToSupabase(payl
     ? payload.pricesBySupplier
     : {};
   const archived = payload?.archived === true;
-  const expectedUpdatedAt = String(payload?.expectedUpdatedAt || '').trim();
+  const expectedUpdatedAt = normalizeNullableExpectedUpdatedAt(payload?.expectedUpdatedAt);
 
   if (!sku || !name) throw new Error('Część musi mieć sku i name.');
 
-  const { data: currentPart, error: currentPartError } = await window.sb
-    .from('parts')
-    .select('id, sku, updated_at')
-    .eq('company_id', companyId)
-    .eq('sku', originalSku)
-    .maybeSingle();
-  if (currentPartError) throw currentPartError;
+  const supplierRows = await window.fetchCatalogSuppliers(companyId);
+  const pSupplierPrices = selectedSuppliers.map(supplierName => ({
+    supplier_id: getSupplierIdByNameFromCatalogRows(supplierRows, supplierName),
+    price: Math.max(0, Number(pricesBySupplier[supplierName]) || 0)
+  }));
 
-  if (originalSku !== sku) {
-    const { data: duplicatePart, error: duplicatePartError } = await window.sb
-      .from('parts')
-      .select('id')
-      .eq('company_id', companyId)
-      .eq('sku', sku)
-      .maybeSingle();
-    if (duplicatePartError) throw duplicatePartError;
-    if (duplicatePart && duplicatePart.id !== currentPart?.id) {
-      throw new Error(`Część o ID "${sku}" już istnieje w bazie.`);
-    }
-  }
-
-  let savedPart = currentPart || null;
-  const partPayload = {
-    company_id: companyId,
-    sku,
-    name,
-    is_active: !archived,
-    warning_qty: payload?.yellowThreshold == null ? null : Math.max(0, Math.trunc(Number(payload.yellowThreshold) || 0)),
-    critical_qty: payload?.redThreshold == null ? null : Math.max(0, Math.trunc(Number(payload.redThreshold) || 0))
+  const rpcPayload = {
+    p_company_id: companyId,
+    p_original_sku: originalSku,
+    p_sku: sku,
+    p_name: name,
+    p_is_active: !archived,
+    p_warning_qty: payload?.yellowThreshold == null ? null : Math.max(0, Math.trunc(Number(payload.yellowThreshold) || 0)),
+    p_critical_qty: payload?.redThreshold == null ? null : Math.max(0, Math.trunc(Number(payload.redThreshold) || 0)),
+    p_expected_updated_at: expectedUpdatedAt,
+    p_supplier_prices: pSupplierPrices
   };
 
-  if (savedPart?.id) {
-    const { data, error } = await window.sb
-      .from('parts')
-      .update(partPayload)
-      .eq('id', savedPart.id)
-      .eq('updated_at', ensureExpectedUpdatedAt(expectedUpdatedAt, 'część'))
-      .select('id, sku, updated_at')
-      .maybeSingle();
-    if (error) throw error;
-    if (!data) {
-      throw new Error(getCatalogConflictErrorMessage('część'));
-    }
-    savedPart = data;
-  } else {
-    const { data, error } = await window.sb
-      .from('parts')
-      .insert(partPayload)
-      .select('id, sku, updated_at')
-      .maybeSingle();
-    if (error) throw error;
-    savedPart = data;
-  }
+  const { data, error } = await window.sb.rpc('save_catalog_part', rpcPayload);
+  if (error) throw error;
 
-  if (!savedPart?.id) throw new Error('Nie udało się zapisać części w Supabase.');
-
-  const supplierRows = await window.fetchCatalogSuppliers(companyId);
-  const supplierIdsByName = new Map(
-    (supplierRows || [])
-      .map(row => [String(row?.name || '').trim(), row?.id])
-      .filter(entry => entry[0] && entry[1])
-  );
-
-  const { error: deletePricesError } = await window.sb
-    .from('supplier_part_prices')
-    .delete()
-    .eq('part_id', savedPart.id);
-  if (deletePricesError) throw deletePricesError;
-
-  const pricePayload = selectedSuppliers
-    .map(nameKey => {
-      const supplierId = supplierIdsByName.get(nameKey);
-      if (!supplierId) return null;
-      return {
-        company_id: companyId,
-        supplier_id: supplierId,
-        part_id: savedPart.id,
-        price: Math.max(0, Number(pricesBySupplier[nameKey]) || 0)
-      };
-    })
-    .filter(Boolean);
-
-  if (pricePayload.length) {
-    const { error: insertPricesError } = await window.sb
-      .from('supplier_part_prices')
-      .insert(pricePayload);
-    if (insertPricesError) throw insertPricesError;
+  const savedPart = data?.part || null;
+  if (!savedPart || !savedPart.id) {
+    throw new Error('Nie udało się zapisać części w Supabase.');
   }
 
   return savedPart;
@@ -825,95 +796,33 @@ window.saveMachineDefinitionToSupabase = async function saveMachineDefinitionToS
   const name = String(payload?.name || '').trim();
   const originalCode = String(payload?.originalCode || code).trim();
   const archived = payload?.archived === true;
-  const expectedUpdatedAt = String(payload?.expectedUpdatedAt || '').trim();
+  const expectedUpdatedAt = normalizeNullableExpectedUpdatedAt(payload?.expectedUpdatedAt);
   const bom = Array.isArray(payload?.bom) ? payload.bom : [];
 
   if (!code || !name) throw new Error('Maszyna musi mieć code i name.');
 
-  const { data: currentMachine, error: currentMachineError } = await window.sb
-    .from('machine_definitions')
-    .select('id, code, updated_at')
-    .eq('company_id', companyId)
-    .eq('code', originalCode)
-    .maybeSingle();
-  if (currentMachineError) throw currentMachineError;
+  const partsRows = await window.fetchCatalogParts(companyId);
+  const pBom = bom.map(item => ({
+    part_id: getPartIdBySkuFromCatalogRows(partsRows, item?.sku),
+    qty: Math.max(1, Math.trunc(Number(item?.qty) || 1))
+  }));
 
-  if (originalCode !== code) {
-    const { data: duplicateMachine, error: duplicateMachineError } = await window.sb
-      .from('machine_definitions')
-      .select('id')
-      .eq('company_id', companyId)
-      .eq('code', code)
-      .maybeSingle();
-    if (duplicateMachineError) throw duplicateMachineError;
-    if (duplicateMachine && duplicateMachine.id !== currentMachine?.id) {
-      throw new Error(`Maszyna o kodzie "${code}" już istnieje w bazie.`);
-    }
-  }
-
-  let savedMachine = currentMachine || null;
-  const machinePayload = {
-    company_id: companyId,
-    code,
-    name,
-    is_active: !archived
+  const rpcPayload = {
+    p_company_id: companyId,
+    p_original_code: originalCode,
+    p_code: code,
+    p_name: name,
+    p_is_active: !archived,
+    p_expected_updated_at: expectedUpdatedAt,
+    p_bom: pBom
   };
 
-  if (savedMachine?.id) {
-    const { data, error } = await window.sb
-      .from('machine_definitions')
-      .update(machinePayload)
-      .eq('id', savedMachine.id)
-      .eq('updated_at', ensureExpectedUpdatedAt(expectedUpdatedAt, 'definicji maszyny'))
-      .select('id, code, updated_at')
-      .maybeSingle();
-    if (error) throw error;
-    if (!data) {
-      throw new Error(getCatalogConflictErrorMessage('rekord definicji maszyny'));
-    }
-    savedMachine = data;
-  } else {
-    const { data, error } = await window.sb
-      .from('machine_definitions')
-      .insert(machinePayload)
-      .select('id, code, updated_at')
-      .maybeSingle();
-    if (error) throw error;
-    savedMachine = data;
-  }
+  const { data, error } = await window.sb.rpc('save_machine_definition', rpcPayload);
+  if (error) throw error;
 
-  if (!savedMachine?.id) throw new Error('Nie udało się zapisać definicji maszyny.');
-
-  const partsRows = await window.fetchCatalogParts(companyId);
-  const partIdsBySku = new Map(
-    (partsRows || [])
-      .map(row => [String(row?.sku || '').trim().toLowerCase(), row?.id])
-      .filter(entry => entry[0] && entry[1])
-  );
-
-  const { error: deleteBomError } = await window.sb
-    .from('machine_bom_items')
-    .delete()
-    .eq('machine_definition_id', savedMachine.id);
-  if (deleteBomError) throw deleteBomError;
-
-  const bomPayload = bom.map(item => {
-    const sku = String(item?.sku || '').trim().toLowerCase();
-    const partId = partIdsBySku.get(sku);
-    if (!partId) throw new Error(`Nie znaleziono części BOM dla sku "${item?.sku || ''}".`);
-    return {
-      company_id: companyId,
-      machine_definition_id: savedMachine.id,
-      part_id: partId,
-      qty: Math.max(1, Math.trunc(Number(item?.qty) || 1))
-    };
-  });
-
-  if (bomPayload.length) {
-    const { error: insertBomError } = await window.sb
-      .from('machine_bom_items')
-      .insert(bomPayload);
-    if (insertBomError) throw insertBomError;
+  const savedMachine = data?.machine || null;
+  if (!savedMachine || !savedMachine.id) {
+    throw new Error('Nie udało się zapisać definicji maszyny.');
   }
 
   return savedMachine;

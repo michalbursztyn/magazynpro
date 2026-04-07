@@ -1390,12 +1390,31 @@ window.saveBuildToSupabase = async function saveBuildToSupabase(payload = {}) {
 
 window.saveStockAdjustmentToSupabase = async function saveStockAdjustmentToSupabase(payload = {}) {
   const companyId = requireBusinessCompanyId(payload?.companyId);
-  await persistInventoryLotsSnapshot(Array.isArray(payload?.nextLots) ? payload.nextLots : [], companyId);
-  await insertHistoryEventRow(payload?.historyEvent || {
-    type: 'adjustment',
-    dateISO: '',
-    items: []
-  }, companyId);
+  const dateISO = String(payload?.dateISO || '').trim();
+  const items = Array.isArray(payload?.items) ? payload.items : [];
+  const adjustmentAt = dateISO ? `${dateISO}T00:00:00Z` : null;
+
+  if (!adjustmentAt) throw new Error('Brak daty korekty stanów.');
+  if (!items.length) throw new Error('Brak pozycji korekty stanów do zapisania.');
+
+  const rpcItems = items.map(item => ({
+    sku: String(item?.sku || '').trim(),
+    previous_qty: normalizeBusinessInt(item?.previousQty, 0),
+    new_qty: normalizeBusinessInt(item?.newQty, 0),
+    reference_unit_price: Math.max(0, normalizeBusinessNumber(item?.referenceUnitPrice, 0))
+  }));
+
+  const invalidItem = rpcItems.find(item => !item.sku);
+  if (invalidItem) throw new Error('Każda pozycja korekty musi mieć sku.');
+
+  const { data, error } = await window.sb.rpc('apply_stock_adjustment', {
+    p_company_id: companyId,
+    p_date: adjustmentAt,
+    p_items: rpcItems
+  });
+
+  if (error) throw error;
+  return data;
 };
 
 window.testSupabaseConnection = async function testSupabaseConnection() {

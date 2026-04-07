@@ -1305,15 +1305,20 @@ async function commitStockAdjustments() {
       return;
     }
 
+    const dateISO = getTodayISO();
     const changes = pending
       .filter(Boolean)
-      .map(item => ({
-        sku: normalize(item.sku),
-        name: normalize(item.name),
-        previousQty: safeQtyInt(item.previousQty),
-        newQty: safeQtyInt(item.newQty),
-        diff: safeQtyInt(item.newQty) - safeQtyInt(item.previousQty)
-      }))
+      .map(item => {
+        const sku = normalize(item.sku);
+        return {
+          sku,
+          name: normalize(item.name),
+          previousQty: safeQtyInt(item.previousQty),
+          newQty: safeQtyInt(item.newQty),
+          diff: safeQtyInt(item.newQty) - safeQtyInt(item.previousQty),
+          referenceUnitPrice: safeFloat(getLastKnownUnitPrice(sku))
+        };
+      })
       .filter(item => item.newQty !== item.previousQty);
 
     if (!changes.length) {
@@ -1324,92 +1329,10 @@ async function commitStockAdjustments() {
       return;
     }
 
-    const lotsClone = JSON.parse(JSON.stringify(state.lots || []));
-    const dateISO = getTodayISO();
-    const historyItems = [];
-
-    for (const change of changes) {
-      const k = skuKey(change.sku);
-      if (change.diff > 0) {
-        const referenceUnitPrice = getLastKnownUnitPrice(change.sku);
-        const newLot = {
-          sku: change.sku,
-          name: change.name,
-          supplier: "Korekta stanu",
-          unitPrice: safeFloat(referenceUnitPrice),
-          qty: safeQtyInt(change.diff),
-          dateIn: dateISO
-        };
-        lotsClone.push(newLot);
-        historyItems.push({
-          sku: change.sku,
-          name: change.name,
-          previousQty: change.previousQty,
-          newQty: change.newQty,
-          diff: change.diff,
-          direction: "plus",
-          referenceUnitPrice: safeFloat(referenceUnitPrice),
-          createdLot: {
-            lotId: null,
-            qty: safeQtyInt(newLot.qty),
-            supplier: newLot.supplier,
-            dateIn: newLot.dateIn,
-            unitPrice: safeFloat(newLot.unitPrice)
-          },
-          affectedLots: []
-        });
-        continue;
-      }
-
-      let remainingToRemove = Math.abs(change.diff);
-      const affectedLots = [];
-      const relevantLots = lotsClone
-        .filter(l => skuKey(l.sku) === k && safeQtyInt(l.qty) > 0)
-        .sort(compareLotsForConsumption);
-
-      for (const lot of relevantLots) {
-        if (remainingToRemove <= 0) break;
-        const available = safeQtyInt(lot.qty);
-        if (available <= 0) continue;
-        const taken = Math.min(available, remainingToRemove);
-        lot.qty = available - taken;
-        remainingToRemove -= taken;
-        affectedLots.push({
-          lotId: lot.id != null ? String(lot.id) : null,
-          removedQty: safeQtyInt(taken),
-          supplier: lot.supplier || "-",
-          dateIn: lot.dateIn || null,
-          unitPrice: safeFloat(lot.unitPrice || 0),
-          remainingAfter: safeQtyInt(lot.qty)
-        });
-      }
-
-      if (remainingToRemove > 0) {
-        toast("Błąd korekty", `Nie udało się odjąć pełnej ilości dla części ${change.sku}.`, "error");
-        return;
-      }
-
-      historyItems.push({
-        sku: change.sku,
-        name: change.name,
-        previousQty: change.previousQty,
-        newQty: change.newQty,
-        diff: change.diff,
-        direction: "minus",
-        referenceUnitPrice: 0,
-        affectedLots
-      });
-    }
-
-    const nextLots = lotsClone.filter(l => safeQtyInt(l.qty) > 0);
-    const historyEvent = {
-      type: "adjustment",
+    await window.saveStockAdjustmentToSupabase?.({
       dateISO,
-      partsChanged: historyItems.length,
-      items: historyItems
-    };
-
-    await window.saveStockAdjustmentToSupabase?.({ nextLots, historyEvent });
+      items: changes
+    });
     await window.loadOperationalStateFromSupabaseIntoState?.({ silent: true });
 
     state.ui.stockEditMode = false;
@@ -1418,7 +1341,7 @@ async function commitStockAdjustments() {
     save();
     renderWarehouse();
     renderHistory();
-    toast("Korekty zapisane", `Zapisano korekty dla ${historyItems.length} ${historyItems.length === 1 ? "części" : "części"}.`, "success");
+    toast("Korekty zapisane", `Zapisano korekty dla ${changes.length} ${changes.length === 1 ? "części" : "części"}.`, "success");
   } catch (err) {
     console.error("Błąd zapisu korekt do Supabase:", err);
     toast("Nie zapisano korekt", err?.message || "Nie udało się zapisać korekt stanów w Supabase.", "error");

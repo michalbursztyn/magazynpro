@@ -2968,7 +2968,17 @@ body.part-details-open {
 }
 
 .users-create-form-row-credentials {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: end;
+}
+
+.users-create-form-row-credentials > label {
+  min-width: 0;
+}
+
+.users-create-form-row-credentials input {
+  width: 100%;
+  min-width: 0;
 }
 
 .history-author-cell {

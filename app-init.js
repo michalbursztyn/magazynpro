@@ -1629,42 +1629,75 @@ async function init() {
   const dangerRange = document.getElementById("dangerRange");
   const warnValue = document.getElementById("warnValue");
   const dangerValue = document.getElementById("dangerValue");
-  
-  if (warnRange) warnRange.value = String(LOW_WARN);
-  if (dangerRange) dangerRange.value = String(LOW_DANGER);
-  if (warnValue) warnValue.textContent = String(LOW_WARN);
-  if (dangerValue) dangerValue.textContent = String(LOW_DANGER);
 
-  warnRange?.addEventListener("input", (e) => {
-    const v = parseInt(e.target.value, 10);
-    LOW_WARN = Number.isFinite(v) ? Math.max(0, v) : 0;
+  const normalizeCompanyThresholdPair = (warnRaw, dangerRaw) => {
+    const normalizedWarn = strictNonNegInt(warnRaw) ?? 100;
+    const normalizedDanger = strictNonNegInt(dangerRaw) ?? 50;
+    return {
+      lowWarn: Math.max(0, normalizedWarn),
+      lowDanger: Math.min(Math.max(0, normalizedDanger), Math.max(0, normalizedWarn))
+    };
+  };
 
-    if (LOW_DANGER > LOW_WARN) {
-      LOW_DANGER = LOW_WARN;
-      if (dangerRange) dangerRange.value = String(LOW_DANGER);
-      const dv = document.getElementById("dangerValue");
-      if (dv) dv.textContent = String(LOW_DANGER);
+  const syncThresholdInputsFromAuth = () => {
+    const next = normalizeCompanyThresholdPair(
+      window.appAuth?.companyLowWarn,
+      window.appAuth?.companyLowDanger
+    );
+
+    if (warnRange) warnRange.value = String(next.lowWarn);
+    if (dangerRange) dangerRange.value = String(next.lowDanger);
+    if (warnValue) warnValue.textContent = String(next.lowWarn);
+    if (dangerValue) dangerValue.textContent = String(next.lowDanger);
+
+    return next;
+  };
+
+  const syncThresholdLabelsFromInputs = () => {
+    const next = normalizeCompanyThresholdPair(warnRange?.value, dangerRange?.value);
+    if (warnRange) warnRange.value = String(next.lowWarn);
+    if (dangerRange) dangerRange.value = String(next.lowDanger);
+    if (warnValue) warnValue.textContent = String(next.lowWarn);
+    if (dangerValue) dangerValue.textContent = String(next.lowDanger);
+    return next;
+  };
+
+  const saveThresholdsFromInputs = async () => {
+    if (!window.saveCompanyThresholdsToSupabase) return;
+
+    const next = syncThresholdLabelsFromInputs();
+    try {
+      const savedCompany = await window.saveCompanyThresholdsToSupabase(next.lowWarn, next.lowDanger);
+      window.appAuth.companyLowWarn = strictNonNegInt(savedCompany?.low_warn) ?? next.lowWarn;
+      window.appAuth.companyLowDanger = Math.min(
+        strictNonNegInt(savedCompany?.low_danger) ?? next.lowDanger,
+        window.appAuth.companyLowWarn
+      );
+      syncThresholdInputsFromAuth();
+      renderWarehouse();
+    } catch (err) {
+      console.error('Błąd zapisu progów firmy do Supabase:', err);
+      syncThresholdInputsFromAuth();
+      toast('Nie zapisano progów', err?.message || 'Nie udało się zapisać progów firmy.', 'error');
     }
+  };
 
-    const wv = document.getElementById("warnValue");
-    if (wv) wv.textContent = String(LOW_WARN);
-    save();
-    renderWarehouse();
+  syncThresholdInputsFromAuth();
+
+  warnRange?.addEventListener("input", () => {
+    syncThresholdLabelsFromInputs();
   });
 
-  dangerRange?.addEventListener("input", (e) => {
-    const v = parseInt(e.target.value, 10);
-    LOW_DANGER = Number.isFinite(v) ? Math.max(0, v) : 0;
+  dangerRange?.addEventListener("input", () => {
+    syncThresholdLabelsFromInputs();
+  });
 
-    if (LOW_DANGER > LOW_WARN) {
-      LOW_DANGER = LOW_WARN;
-      if (dangerRange) dangerRange.value = String(LOW_DANGER);
-    }
+  warnRange?.addEventListener("change", () => {
+    void saveThresholdsFromInputs();
+  });
 
-    const dv = document.getElementById("dangerValue");
-    if (dv) dv.textContent = String(LOW_DANGER);
-    save();
-    renderWarehouse();
+  dangerRange?.addEventListener("change", () => {
+    void saveThresholdsFromInputs();
   });
 
   // Part edit buttons

@@ -23,6 +23,8 @@ window.APP_SUPABASE_CONFIG = {
       membership: null,
       companyId: null,
       companyName: null,
+      companyLowWarn: null,
+      companyLowDanger: null,
       companyRole: null,
       rolePermissions: {}
     };
@@ -52,6 +54,8 @@ window.APP_SUPABASE_CONFIG = {
     membership: null,
     companyId: null,
     companyName: null,
+    companyLowWarn: null,
+    companyLowDanger: null,
     companyRole: null,
     rolePermissions: {}
   };
@@ -93,6 +97,8 @@ window.refreshAuthContext = async function refreshAuthContext(sessionOverride) {
     window.appAuth.membership = null;
     window.appAuth.companyId = null;
     window.appAuth.companyName = null;
+    window.appAuth.companyLowWarn = null;
+    window.appAuth.companyLowDanger = null;
     window.appAuth.companyRole = null;
     window.appAuth.rolePermissions = {};
 
@@ -140,7 +146,7 @@ window.refreshAuthContext = async function refreshAuthContext(sessionOverride) {
     if (membership?.company_id) {
       const { data: companyData, error: companyError } = await window.sb
         .from("companies")
-        .select("id, name")
+        .select("id, name, low_warn, low_danger")
         .eq("id", membership.company_id)
         .maybeSingle();
 
@@ -176,8 +182,13 @@ window.refreshAuthContext = async function refreshAuthContext(sessionOverride) {
 
     window.appAuth.profile = profile || null;
     window.appAuth.membership = membership || null;
+    const companyLowWarn = normalizeBusinessInt(company?.low_warn, 100);
+    const companyLowDanger = Math.min(normalizeBusinessInt(company?.low_danger, 50), companyLowWarn);
+
     window.appAuth.companyId = membership?.company_id || null;
     window.appAuth.companyName = company?.name || null;
+    window.appAuth.companyLowWarn = company ? companyLowWarn : null;
+    window.appAuth.companyLowDanger = company ? companyLowDanger : null;
     window.appAuth.companyRole = membership?.role || null;
     window.appAuth.rolePermissions = rolePermissions;
 
@@ -867,6 +878,36 @@ function normalizeBusinessNumber(value, fallback = 0) {
 function normalizeBusinessInt(value, fallback = 0) {
   return Math.max(0, Math.trunc(normalizeBusinessNumber(value, fallback)));
 }
+
+window.saveCompanyThresholdsToSupabase = async function saveCompanyThresholdsToSupabase(lowWarn, lowDanger, companyIdOverride) {
+  const companyId = companyIdOverride || window.appAuth?.companyId;
+  if (!window.sb) throw new Error("Brak klienta Supabase.");
+  if (!companyId) throw new Error("Brak company_id w kontekście użytkownika.");
+
+  const normalizedLowWarn = normalizeBusinessInt(lowWarn, 100);
+  const normalizedLowDanger = normalizeBusinessInt(lowDanger, 50);
+  const safeLowWarn = Math.max(0, normalizedLowWarn);
+  const safeLowDanger = Math.min(Math.max(0, normalizedLowDanger), safeLowWarn);
+
+  const { data, error } = await window.sb
+    .from('companies')
+    .update({
+      low_warn: safeLowWarn,
+      low_danger: safeLowDanger
+    })
+    .eq('id', companyId)
+    .select('id, name, low_warn, low_danger')
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) throw new Error('Nie udało się zapisać progów firmy.');
+
+  return {
+    ...data,
+    low_warn: normalizeBusinessInt(data.low_warn, safeLowWarn),
+    low_danger: Math.min(normalizeBusinessInt(data.low_danger, safeLowDanger), normalizeBusinessInt(data.low_warn, safeLowWarn))
+  };
+};
 
 const INVENTORY_LOT_DB_FIELDS = Object.freeze({
   initialQty: 'qty_initial',

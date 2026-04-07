@@ -38,8 +38,6 @@ const state = {
 
 let _idCounter = 1;
 let currentEditPartKey = null;
-let LOW_WARN = 100;
-let LOW_DANGER = 50;
 
 const fmtPLN = new Intl.NumberFormat("pl-PL", { style: "currency", currency: "PLN" });
 
@@ -88,9 +86,7 @@ function serializeState() {
     ui: {
       showArchivedPartsInWarehouse: shouldShowArchivedPartsInWarehouse(),
       showArchivedMachinesInStock: shouldShowArchivedMachinesInStock()
-    },
-    LOW_WARN,
-    LOW_DANGER
+    }
   };
 }
 
@@ -135,13 +131,6 @@ function restoreState(data) {
     state.ui.showArchivedPartsInWarehouse = data.ui.showArchivedPartsInWarehouse !== false;
     state.ui.showArchivedMachinesInStock = data.ui.showArchivedMachinesInStock !== false;
   }
-
-  // Thresholds with invariants
-  LOW_WARN = (strictNonNegInt(data.LOW_WARN) ?? 100);
-  LOW_DANGER = (strictNonNegInt(data.LOW_DANGER) ?? 50);
-  if (LOW_WARN < 0) LOW_WARN = 0;
-  if (LOW_DANGER < 0) LOW_DANGER = 0;
-  if (LOW_DANGER > LOW_WARN) LOW_DANGER = LOW_WARN;
 
 
   state.ui.stockEditMode = false;
@@ -462,10 +451,14 @@ function resolvePartThresholdConfig(partOrSku) {
 
   const yellow = normalizeThresholdValue(part?.yellowThreshold);
   const red = normalizeThresholdValue(part?.redThreshold);
+  const companyLowWarnRaw = strictNonNegInt(window.appAuth?.companyLowWarn);
+  const companyLowDangerRaw = strictNonNegInt(window.appAuth?.companyLowDanger);
+  const companyLowWarn = companyLowWarnRaw ?? 100;
+  const companyLowDanger = Math.min(companyLowDangerRaw ?? 50, companyLowWarn);
 
   return {
-    yellowThreshold: yellow ?? LOW_WARN,
-    redThreshold: red ?? LOW_DANGER,
+    yellowThreshold: yellow ?? companyLowWarn,
+    redThreshold: red ?? companyLowDanger,
     usesCustomThresholds: yellow !== null && red !== null
   };
 }

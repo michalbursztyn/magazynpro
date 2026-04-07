@@ -832,7 +832,7 @@ function renderHistory() {
       : (view === "builds")
         ? "Brak produkcji w historii dla wybranych filtrów."
         : "Brak korekt w historii dla wybranych filtrów.";
-    tbody.innerHTML = `<tr><td colspan="3" class="text-muted" style="text-align:center;padding:var(--space-6)">${msg}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4" class="text-muted" style="text-align:center;padding:var(--space-6)">${msg}</td></tr>`;
     return;
   }
 
@@ -895,6 +895,7 @@ function renderHistory() {
     return `
       <tr data-hid="${ev.id}">
         <td style="white-space:nowrap">${date}</td>
+        <td class="history-author-cell"><span class="history-author-value">${escapeHtml(ev.authorName || '—')}</span></td>
         <td>${summary}</td>
         <td class="text-right">
           <button class="btn btn-secondary btn-sm" type="button" 
@@ -910,6 +911,7 @@ function renderHistory() {
 function buildHistoryDetails(ev) {
   if (!ev) return "";
 
+  const authorLabel = escapeHtml(ev.authorName || '—');
   const isDelivery = ev.type === "delivery";
   const isBuild = ev.type === "build";
   const isAdjustment = ev.type === "adjustment";
@@ -998,6 +1000,7 @@ function buildHistoryDetails(ev) {
           <div class="history-modal-kicker"><span class="badge ${badgeClass}">${typeLabel}</span><span>${fmtDateISO(ev.dateISO)}</span></div>
           <h3 class="history-modal-title">Podgląd korekty stanów</h3>
           <p class="history-modal-subtitle">Zbiorcza sesja korekt z czytelnym rozpisaniem stanu przed, po i sposobu rozliczenia.</p>
+          <p class="history-modal-subtitle">Wykonał: ${authorLabel}</p>
         </div>
       </div>
 
@@ -1038,6 +1041,7 @@ function buildHistoryDetails(ev) {
           <div class="history-modal-kicker"><span class="badge ${badgeClass}">${typeLabel}</span><span>${fmtDateISO(ev.dateISO)}</span></div>
           <h3 class="history-modal-title">Podgląd dostawy</h3>
           <p class="history-modal-subtitle">Szczegóły przyjęcia od dostawcy i pełne zestawienie pozycji.</p>
+          <p class="history-modal-subtitle">Wykonał: ${authorLabel}</p>
         </div>
       </div>
 
@@ -1183,6 +1187,7 @@ function buildHistoryDetails(ev) {
         <div class="history-modal-kicker"><span class="badge ${badgeClass}">${typeLabel}</span><span>${fmtDateISO(ev.dateISO)}</span></div>
         <h3 class="history-modal-title">Podgląd produkcji</h3>
         <p class="history-modal-subtitle">Rozpiska maszyn i realnie zużytych partii magazynowych.</p>
+        <p class="history-modal-subtitle">Wykonał: ${authorLabel}</p>
       </div>
     </div>
 

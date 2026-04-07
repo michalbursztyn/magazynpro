@@ -361,12 +361,15 @@ window.updateCompanyMember = async function updateCompanyMember(memberId, update
 window.createCompanyUser = async function createCompanyUser(payload = {}) {
   if (!window.sb) throw new Error("Brak klienta Supabase.");
 
+  const fullName = String(payload?.fullName || "").trim();
   const email = String(payload?.email || "").trim().toLowerCase();
   const password = String(payload?.password || "");
   const role = String(payload?.role || "worker").trim().toLowerCase() || "worker";
   const companyId = window.appAuth?.companyId || null;
 
   if (!companyId) throw new Error("Brak company_id w kontekście użytkownika.");
+  if (!fullName) throw new Error("Podaj imię i nazwisko pracownika.");
+  if (fullName.length > 150) throw new Error("Imię i nazwisko nie może przekraczać 150 znaków.");
   if (!email) throw new Error("Podaj adres e-mail pracownika.");
   if (!password) throw new Error("Podaj hasło startowe.");
   if (password.length < 6) throw new Error("Hasło startowe musi mieć co najmniej 6 znaków.");
@@ -403,6 +406,7 @@ window.createCompanyUser = async function createCompanyUser(payload = {}) {
       "Authorization": `Bearer ${accessToken}`
     },
     body: JSON.stringify({
+      fullName,
       email,
       password,
       companyId,
@@ -1029,17 +1033,24 @@ function getHistoryEventDescription(historyEvent = {}) {
   return dateISO || '';
 }
 
-function mapDbHistoryRowToUi(row = {}) {
+function mapDbHistoryRowToUi(row = {}, author = null) {
   const payload = row?.payload && typeof row.payload === 'object' ? row.payload : {};
   const localType = mapDbEventTypeToLocal(row?.event_type);
   const dateISO = getHistoryEventDateISO(row, payload);
   const ts = Date.parse(String(row?.created_at || '').trim()) || Date.now();
+  const authorFullName = String(author?.full_name || '').trim();
+  const authorEmail = String(author?.email || '').trim();
+  const authorName = authorFullName || authorEmail || '—';
+  const authorUserId = row?.created_by || null;
 
   if (localType === 'delivery') {
     return {
       id: row?.id,
       ts,
       type: 'delivery',
+      authorName,
+      authorEmail: authorEmail || null,
+      authorUserId,
       dateISO,
       supplier: String(payload?.supplier || '-').trim() || '-',
       items: (Array.isArray(payload?.items) ? payload.items : []).map(item => ({
@@ -1056,6 +1067,9 @@ function mapDbHistoryRowToUi(row = {}) {
       id: row?.id,
       ts,
       type: 'build',
+      authorName,
+      authorEmail: authorEmail || null,
+      authorUserId,
       dateISO,
       items: (Array.isArray(payload?.items) ? payload.items : []).map(item => ({
         code: String(item?.code || '').trim(),
@@ -1080,6 +1094,9 @@ function mapDbHistoryRowToUi(row = {}) {
       id: row?.id,
       ts,
       type: 'adjustment',
+      authorName,
+      authorEmail: authorEmail || null,
+      authorUserId,
       dateISO,
       partsChanged: normalizeBusinessInt(payload?.parts_changed ?? payload?.partsChanged ?? items.length, items.length),
       items: items.map(item => ({
@@ -1147,10 +1164,25 @@ window.fetchHistoryEventRows = async function fetchHistoryEventRows(companyIdOve
   const companyId = requireBusinessCompanyId(companyIdOverride);
   const { data, error } = await window.sb
     .from('history_events')
-    .select('id, company_id, event_type, title, description, payload, created_at')
+    .select('id, company_id, event_type, title, description, payload, created_at, created_by')
     .eq('company_id', companyId)
     .order('created_at', { ascending: false })
     .order('id', { ascending: false });
+
+  if (error) throw error;
+  return Array.isArray(data) ? data : [];
+};
+
+window.fetchProfilesByIds = async function fetchProfilesByIds(userIds = []) {
+  requireBusinessCompanyId();
+
+  const ids = [...new Set((Array.isArray(userIds) ? userIds : []).map(id => String(id || '').trim()).filter(Boolean))];
+  if (!ids.length) return [];
+
+  const { data, error } = await window.sb
+    .from('profiles')
+    .select('id, email, full_name')
+    .in('id', ids);
 
   if (error) throw error;
   return Array.isArray(data) ? data : [];
@@ -1163,6 +1195,10 @@ window.fetchOperationalStateFromSupabase = async function fetchOperationalStateF
     window.fetchMachineStockRows(lookups.companyId),
     window.fetchHistoryEventRows(lookups.companyId)
   ]);
+
+  const authorIds = [...new Set((historyRows || []).map(row => String(row?.created_by || '').trim()).filter(Boolean))];
+  const authorProfiles = authorIds.length ? await window.fetchProfilesByIds(authorIds) : [];
+  const authorProfilesById = new Map((authorProfiles || []).map(profile => [profile?.id, profile]).filter(entry => entry[0]));
 
   const lots = (lotRows || []).map(row => {
     const part = lookups.partsById.get(row?.part_id) || null;
@@ -1195,7 +1231,7 @@ window.fetchOperationalStateFromSupabase = async function fetchOperationalStateF
     };
   }).filter(Boolean);
 
-  const history = (historyRows || []).map(mapDbHistoryRowToUi).filter(Boolean);
+  const history = (historyRows || []).map(row => mapDbHistoryRowToUi(row, authorProfilesById.get(row?.created_by) || null)).filter(Boolean);
 
   return { lots, machinesStock, history };
 };

@@ -2953,6 +2953,36 @@ body.part-details-open {
   gap: var(--space-3);
 }
 
+
+.users-create-form-row {
+  margin-bottom: var(--space-3);
+}
+
+.users-create-form-row label {
+  gap: var(--space-2);
+}
+
+.users-create-form-row input,
+.users-create-form-row select {
+  min-height: 44px;
+}
+
+.users-create-form-row-credentials {
+  align-items: end;
+}
+
+.history-author-cell {
+  min-width: 160px;
+}
+
+.history-author-value {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
 .user-role-select {
   min-width: 110px;
 }

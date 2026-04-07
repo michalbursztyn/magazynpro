@@ -1066,13 +1066,27 @@ function bindUserManagementUI() {
       return;
     }
 
+    const fullNameInput = document.getElementById('createWorkerFullNameInput');
     const emailInput = document.getElementById('createWorkerEmailInput');
     const passwordInput = document.getElementById('createWorkerPasswordInput');
     const roleSelect = document.getElementById('createWorkerRoleSelect');
 
+    const fullName = String(fullNameInput?.value || '').trim();
     const email = String(emailInput?.value || '').trim().toLowerCase();
     const password = String(passwordInput?.value || '');
     const role = String(roleSelect?.value || 'worker').trim().toLowerCase() || 'worker';
+
+    if (!fullName) {
+      toast('Brak imienia i nazwiska', 'Podaj imię i nazwisko użytkownika.', 'warning');
+      fullNameInput?.focus?.();
+      return;
+    }
+
+    if (fullName.length > 150) {
+      toast('Za długa nazwa', 'Imię i nazwisko nie może przekraczać 150 znaków.', 'warning');
+      fullNameInput?.focus?.();
+      return;
+    }
 
     if (!email) {
       toast('Brak e-maila', 'Podaj adres e-mail użytkownika.', 'warning');
@@ -1105,11 +1119,13 @@ function bindUserManagementUI() {
 
     try {
       const result = await window.createCompanyUser?.({
+        fullName,
         email,
         password,
         role
       });
 
+      if (fullNameInput) fullNameInput.value = '';
       if (emailInput) emailInput.value = '';
       if (passwordInput) passwordInput.value = '';
       if (roleSelect) roleSelect.value = 'worker';

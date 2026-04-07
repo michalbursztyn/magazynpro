@@ -222,7 +222,12 @@
                   <span class="editor-hint">Tworzenie konta przez Edge Function, bez admin API w przeglądarce.</span>
                 </div>
               </div>
-              <div class="form-row form-row-2" style="margin-bottom:var(--space-3)">
+              <div class="form-row users-create-form-row" style="margin-bottom:var(--space-3)">
+                <label>Imię i nazwisko
+                  <input type="text" id="createWorkerFullNameInput" placeholder="Jan Kowalski" autocomplete="name" />
+                </label>
+              </div>
+              <div class="form-row form-row-2 users-create-form-row users-create-form-row-credentials" style="margin-bottom:var(--space-3)">
                 <label>Adres e-mail
                   <input type="email" id="createWorkerEmailInput" placeholder="pracownik@firma.pl" autocomplete="email" />
                 </label>
@@ -310,7 +315,7 @@
             </div>
           </div>
           <div class="table-container">
-            <table class="table-sticky" id="historyTable"><thead><tr><th>Data</th><th>Szczegóły</th><th class="text-right">Podgląd</th></tr></thead><tbody></tbody></table>
+            <table class="table-sticky" id="historyTable"><thead><tr><th>Data</th><th>Autor</th><th>Szczegóły</th><th class="text-right">Podgląd</th></tr></thead><tbody></tbody></table>
           </div>
           <p class="text-muted" style="margin-top:var(--space-3);font-size:var(--text-sm)">Tip: Kliknij "Podgląd" dla szczegółów.</p>
         </div>

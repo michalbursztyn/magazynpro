@@ -3063,6 +3063,178 @@ body.part-details-open {
   flex-wrap: wrap;
 }
 
+.user-name-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.user-name-cell strong {
+  color: var(--text);
+  word-break: break-word;
+}
+
+.user-name-cell span {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.user-role-text {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  color: var(--text);
+  font-weight: var(--font-medium);
+}
+
+.user-row-actions-clean {
+  display: inline-flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.user-info-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1260;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(16px, 3vw, 32px);
+  background: rgba(5, 8, 17, 0.58);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.user-info-backdrop.hidden {
+  display: none;
+}
+
+.user-info-shell {
+  position: relative;
+  width: min(820px, 100%);
+  max-height: calc(100vh - clamp(32px, 6vw, 64px));
+}
+
+.user-info-panel {
+  max-height: inherit;
+  overflow: auto;
+  margin: 0;
+  background: var(--modal-panel-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 40px 120px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  padding: var(--space-5);
+}
+
+.user-info-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(15, 17, 25, 0.9);
+  color: var(--text-secondary);
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 2;
+  transition: all var(--trans-fast);
+}
+
+.user-info-close:hover {
+  color: var(--text);
+  background: rgba(24, 27, 39, 0.96);
+  border-color: var(--border-strong);
+}
+
+.user-info-head {
+  padding-right: 52px;
+  margin-bottom: var(--space-5);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.user-info-kicker {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-2);
+  color: var(--text-tertiary);
+  font-size: var(--text-sm);
+}
+
+.user-info-title {
+  font-size: clamp(1.25rem, 1rem + 0.7vw, 1.7rem);
+  margin-bottom: var(--space-1);
+}
+
+.user-info-subtitle {
+  color: var(--text-secondary);
+}
+
+.user-info-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.user-info-card {
+  min-width: 0;
+  padding: var(--space-4);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.user-info-card-label {
+  display: block;
+  margin-bottom: var(--space-1);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+}
+
+.user-info-card-value {
+  display: block;
+  color: var(--text);
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  word-break: break-word;
+}
+
+.user-info-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.user-info-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+body.user-info-open {
+  overflow: hidden;
+}
+
 .users-admin-readonly-note {
   margin-top: var(--space-3);
   margin-bottom: var(--space-3);
@@ -3208,6 +3380,40 @@ body.part-details-open {
 @media (max-width: 980px) {
   .users-admin-block-full {
     grid-column: auto;
+  }
+}
+
+@media (max-width: 720px) {
+  .user-info-summary-grid,
+  .user-info-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .user-row-actions-clean,
+  .user-info-actions {
+    width: 100%;
+  }
+
+  .user-row-actions-clean .btn,
+  .user-info-actions .btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 900px) {
+  .user-info-backdrop {
+    align-items: flex-start;
+    padding: 12px;
+  }
+
+  .user-info-shell,
+  .user-info-panel {
+    width: 100%;
+    max-height: calc(100vh - 24px);
+  }
+
+  .user-info-head {
+    padding-right: 44px;
   }
 }
 

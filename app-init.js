@@ -953,6 +953,130 @@ async function loadCompanyUsers() {
   }
 }
 
+window.companyUserModalState = window.companyUserModalState || {
+  memberId: null
+};
+
+function getCompanyUserByMemberId(memberId) {
+  const normalizedMemberId = String(memberId || '').trim();
+  const items = Array.isArray(window.companyUsersState?.items) ? window.companyUsersState.items : [];
+  return items.find(item => String(item?.id || '').trim() === normalizedMemberId) || null;
+}
+
+function getCompanyUserAdminMeta(item) {
+  const currentUserId = window.appAuth?.user?.id || null;
+  const rowRole = String(item?.role || '').trim().toLowerCase();
+  const isOwnerRow = rowRole === 'owner';
+  const isSelf = !!currentUserId && item?.user_id === currentUserId;
+  const isOwner = isCurrentCompanyOwner();
+  const canModify = isOwner && !isOwnerRow && !isSelf;
+  const statusCls = item?.is_active ? 'success' : 'warning';
+  const statusLabel = item?.is_active ? 'Aktywny' : 'Nieaktywny';
+  const actionLabel = item?.is_active ? 'Dezaktywuj użytkownika' : 'Aktywuj użytkownika';
+  const nextActive = !item?.is_active;
+  const fullName = String(item?.full_name || '').trim() || '—';
+  const email = String(item?.email || '').trim() || '—';
+
+  let readonlyMessage = '';
+  if (!isOwner) {
+    readonlyMessage = 'Tylko owner może zmieniać rolę i status użytkowników.';
+  } else if (isOwnerRow) {
+    readonlyMessage = 'Owner nie może być edytowany z tego poziomu. I bardzo dobrze.';
+  } else if (isSelf) {
+    readonlyMessage = 'Nie możesz zmieniać własnej roli ani aktywności z tego poziomu.';
+  }
+
+  return {
+    rowRole,
+    isOwnerRow,
+    isSelf,
+    canModify,
+    statusCls,
+    statusLabel,
+    actionLabel,
+    nextActive,
+    fullName,
+    email,
+    readonlyMessage
+  };
+}
+
+function openCompanyUserInfoModal(memberId) {
+  const item = getCompanyUserByMemberId(memberId);
+  const backdrop = document.getElementById('userInfoBackdrop');
+  const titleEl = document.getElementById('userInfoTitle');
+  const subtitleEl = document.getElementById('userInfoSubtitle');
+  const roleHintEl = document.getElementById('userInfoModalRoleHint');
+  const summaryEl = document.getElementById('userInfoSummaryGrid');
+  const readonlyNoteEl = document.getElementById('userInfoReadonlyNote');
+  const roleSelect = document.getElementById('userInfoRoleSelect');
+  const statusInput = document.getElementById('userInfoStatusInput');
+  const saveRoleBtn = document.getElementById('userInfoRoleSaveBtn');
+  const toggleActiveBtn = document.getElementById('userInfoToggleActiveBtn');
+
+  if (!item || !backdrop || !summaryEl || !roleSelect || !statusInput || !saveRoleBtn || !toggleActiveBtn) return;
+
+  const meta = getCompanyUserAdminMeta(item);
+  window.companyUserModalState.memberId = String(item.id);
+
+  if (titleEl) titleEl.textContent = meta.fullName;
+  if (subtitleEl) subtitleEl.textContent = meta.email;
+  if (roleHintEl) roleHintEl.textContent = `Rola: ${meta.rowRole}`;
+
+  summaryEl.innerHTML = `
+    <div class="user-info-card">
+      <span class="user-info-card-label">Imię i nazwisko</span>
+      <strong class="user-info-card-value">${escapeHtml(meta.fullName)}</strong>
+    </div>
+    <div class="user-info-card">
+      <span class="user-info-card-label">Adres e-mail</span>
+      <strong class="user-info-card-value">${escapeHtml(meta.email)}</strong>
+    </div>
+    <div class="user-info-card">
+      <span class="user-info-card-label">Rola</span>
+      <strong class="user-info-card-value">${escapeHtml(meta.rowRole)}</strong>
+    </div>
+    <div class="user-info-card">
+      <span class="user-info-card-label">Status aktywności</span>
+      <strong class="user-info-card-value">${escapeHtml(meta.statusLabel)}</strong>
+    </div>
+  `;
+
+  roleSelect.value = ['worker', 'admin'].includes(meta.rowRole) ? meta.rowRole : 'worker';
+  roleSelect.disabled = !meta.canModify;
+  statusInput.value = meta.statusLabel;
+  toggleActiveBtn.textContent = meta.actionLabel;
+  toggleActiveBtn.dataset.memberId = String(item.id);
+  toggleActiveBtn.dataset.nextActive = meta.nextActive ? '1' : '0';
+  toggleActiveBtn.disabled = !meta.canModify;
+  saveRoleBtn.dataset.memberId = String(item.id);
+  saveRoleBtn.disabled = !meta.canModify || !['worker', 'admin'].includes(meta.rowRole);
+
+  if (readonlyNoteEl) {
+    if (meta.readonlyMessage) {
+      readonlyNoteEl.textContent = meta.readonlyMessage;
+      readonlyNoteEl.classList.remove('hidden');
+    } else {
+      readonlyNoteEl.textContent = '';
+      readonlyNoteEl.classList.add('hidden');
+    }
+  }
+
+  backdrop.classList.remove('hidden');
+  backdrop.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('user-info-open');
+}
+
+function closeCompanyUserInfoModal() {
+  const backdrop = document.getElementById('userInfoBackdrop');
+  if (backdrop) {
+    backdrop.classList.add('hidden');
+    backdrop.setAttribute('aria-hidden', 'true');
+  }
+  document.body.classList.remove('user-info-open');
+  window.companyUserModalState.memberId = null;
+}
+
 function renderUsersAdmin() {
   const panel = document.querySelector('[data-tab-panel="users"]');
   const tbody = document.querySelector('#companyUsersTable tbody');
@@ -987,38 +1111,23 @@ function renderUsersAdmin() {
     return;
   }
 
-  const currentUserId = window.appAuth?.user?.id || null;
-
   tbody.innerHTML = items.map(item => {
-    const rowRole = String(item.role || '').toLowerCase();
-    const isOwnerRow = rowRole === 'owner';
-    const isSelf = currentUserId && item.user_id === currentUserId;
-    const canModify = isOwner && !isOwnerRow && !isSelf;
-    const statusCls = item.is_active ? 'success' : 'warning';
-    const statusLabel = item.is_active ? 'Aktywny' : 'Nieaktywny';
-    const actionLabel = item.is_active ? 'Dezaktywuj' : 'Aktywuj';
-    const nextActive = item.is_active ? '0' : '1';
-    const roleBadgeClass = rowRole === 'owner' ? 'badge-accent' : rowRole === 'admin' ? 'badge-success' : 'badge';
+    const meta = getCompanyUserAdminMeta(item);
 
     return `
       <tr>
         <td>
-          <div class="user-email-cell">
-            <strong>${escapeHtml(item.email || '—')}</strong>
-            <span>${escapeHtml(item.full_name || (isSelf ? 'To konto' : ''))}</span>
+          <div class="user-name-cell">
+            <strong>${escapeHtml(meta.fullName)}</strong>
+            <span>${escapeHtml(meta.email)}</span>
           </div>
         </td>
-        <td>
-          ${isOwnerRow
-            ? `<span class="badge ${roleBadgeClass}">owner</span>`
-            : `<span class="user-role-inline"><select class="user-role-select" data-action="userRoleChange" data-member-id="${escapeHtml(String(item.id))}" ${canModify ? '' : 'disabled'}><option value="worker" ${rowRole === 'worker' ? 'selected' : ''}>worker</option><option value="admin" ${rowRole === 'admin' ? 'selected' : ''}>admin</option></select><button type="button" class="btn btn-secondary btn-sm" data-action="saveUserRole" data-member-id="${escapeHtml(String(item.id))}" ${canModify ? '' : 'disabled'}>Zapisz</button></span>`}
-        </td>
-        <td><span class="status-pill status-pill-${statusCls} user-status-pill">${statusLabel}</span></td>
+        <td><span class="user-role-text">${escapeHtml(meta.rowRole)}</span></td>
+        <td><span class="status-pill status-pill-${meta.statusCls} user-status-pill">${meta.statusLabel}</span></td>
         <td class="text-right">
-          <div class="user-row-actions">
-            ${isSelf ? '<span class="badge badge-muted">Twoje konto</span>' : ''}
-            ${isOwnerRow ? '<span class="badge badge-accent">Owner</span>' : ''}
-            <button type="button" class="btn btn-secondary btn-sm" data-action="toggleUserActive" data-member-id="${escapeHtml(String(item.id))}" data-next-active="${nextActive}" ${canModify ? '' : 'disabled'}>${actionLabel}</button>
+          <div class="user-row-actions-clean">
+            <button type="button" class="btn btn-secondary btn-sm" data-action="openUserInfo" data-member-id="${escapeHtml(String(item.id))}">Informacje</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-action="userHistoryPlaceholder" data-member-id="${escapeHtml(String(item.id))}">Historia</button>
           </div>
         </td>
       </tr>
@@ -1174,6 +1283,19 @@ function bindUserManagementUI() {
       return;
     }
 
+    const openUserInfoBtn = e.target?.closest?.('[data-action="openUserInfo"]');
+    if (openUserInfoBtn) {
+      if (!canAccessTab('users')) return;
+      openCompanyUserInfoModal(openUserInfoBtn.getAttribute('data-member-id'));
+      return;
+    }
+
+    const userHistoryPlaceholderBtn = e.target?.closest?.('[data-action="userHistoryPlaceholder"]');
+    if (userHistoryPlaceholderBtn) {
+      toast('Historia w przygotowaniu', 'Historia użytkownika będzie dostępna po wdrożeniu filtrowania po autorze.', 'success');
+      return;
+    }
+
     const saveRoleBtn = e.target?.closest?.('[data-action="saveUserRole"]');
     if (saveRoleBtn) {
       if (!canAccessTab('users')) return;
@@ -1182,7 +1304,13 @@ function bindUserManagementUI() {
         return;
       }
       const memberId = saveRoleBtn.getAttribute('data-member-id');
-      const select = document.querySelector(`[data-action="userRoleChange"][data-member-id="${CSS.escape(memberId)}"]`);
+      const item = getCompanyUserByMemberId(memberId);
+      const meta = item ? getCompanyUserAdminMeta(item) : null;
+      if (!meta?.canModify) {
+        toast('Brak dostępu', meta?.readonlyMessage || 'Ta zmiana nie jest dozwolona.', 'warning');
+        return;
+      }
+      const select = document.getElementById('userInfoRoleSelect');
       const nextRole = String(select?.value || 'worker').trim().toLowerCase();
       if (!['worker', 'admin'].includes(nextRole)) {
         toast('Nieprawidłowa rola', 'Można ustawić tylko rolę worker albo admin.', 'warning');
@@ -1192,6 +1320,7 @@ function bindUserManagementUI() {
         await window.updateCompanyMember?.(memberId, { role: nextRole });
         await loadCompanyUsers();
         renderUsersAdmin();
+        openCompanyUserInfoModal(memberId);
         toast('Rola zapisana', 'Zmiana roli została zapisana.', 'success');
       } catch (err) {
         console.error('Błąd zmiany roli:', err);
@@ -1208,16 +1337,43 @@ function bindUserManagementUI() {
         return;
       }
       const memberId = toggleActiveBtn.getAttribute('data-member-id');
+      const item = getCompanyUserByMemberId(memberId);
+      const meta = item ? getCompanyUserAdminMeta(item) : null;
+      if (!meta?.canModify) {
+        toast('Brak dostępu', meta?.readonlyMessage || 'Ta zmiana nie jest dozwolona.', 'warning');
+        return;
+      }
       const nextActive = toggleActiveBtn.getAttribute('data-next-active') === '1';
       try {
         await window.updateCompanyMember?.(memberId, { is_active: nextActive });
         await loadCompanyUsers();
         renderUsersAdmin();
+        openCompanyUserInfoModal(memberId);
         toast(nextActive ? 'Użytkownik aktywowany' : 'Użytkownik dezaktywowany', 'Status użytkownika został zaktualizowany.', 'success');
       } catch (err) {
         console.error('Błąd zmiany statusu użytkownika:', err);
         toast('Nie zapisano statusu', err?.message || 'Nie udało się zmienić statusu użytkownika.', 'error');
       }
+      return;
+    }
+
+    const closeUserInfoBtn = e.target?.closest?.('#userInfoCloseBtn');
+    if (closeUserInfoBtn) {
+      closeCompanyUserInfoModal();
+      return;
+    }
+
+    const userInfoBackdrop = e.target?.closest?.('#userInfoBackdrop');
+    if (userInfoBackdrop && e.target === userInfoBackdrop) {
+      closeCompanyUserInfoModal();
+      return;
+    }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (document.body.classList.contains('user-info-open')) {
+      closeCompanyUserInfoModal();
     }
   });
 }

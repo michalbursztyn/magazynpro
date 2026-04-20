@@ -263,7 +263,7 @@
                 <table id="companyUsersTable">
                   <thead>
                     <tr>
-                      <th>E-mail</th>
+                      <th>Imię i nazwisko</th>
                       <th>Rola</th>
                       <th>Status</th>
                       <th class="text-right">Akcje</th>
@@ -271,6 +271,45 @@
                   </thead>
                   <tbody></tbody>
                 </table>
+              </div>
+            </div>
+
+            <div class="user-info-backdrop hidden" id="userInfoBackdrop" aria-hidden="true">
+              <div class="user-info-shell">
+                <div class="user-info-panel">
+                  <button type="button" class="user-info-close" id="userInfoCloseBtn" aria-label="Zamknij">×</button>
+                  <div class="user-info-head">
+                    <div>
+                      <div class="user-info-kicker">
+                        <span class="badge badge-accent">Informacje</span>
+                        <span id="userInfoModalRoleHint">Użytkownik firmy</span>
+                      </div>
+                      <h3 class="user-info-title" id="userInfoTitle">Użytkownik</h3>
+                      <p class="user-info-subtitle" id="userInfoSubtitle">Szczegóły konta i akcje administracyjne.</p>
+                    </div>
+                  </div>
+
+                  <div class="user-info-summary-grid" id="userInfoSummaryGrid"></div>
+
+                  <div class="users-admin-readonly-note hidden" id="userInfoReadonlyNote"></div>
+
+                  <div class="user-info-form-grid">
+                    <label>Rola
+                      <select id="userInfoRoleSelect">
+                        <option value="worker">worker</option>
+                        <option value="admin">admin</option>
+                      </select>
+                    </label>
+                    <label>Status aktywności
+                      <input type="text" id="userInfoStatusInput" readonly />
+                    </label>
+                  </div>
+
+                  <div class="user-info-actions">
+                    <button type="button" class="btn btn-secondary" id="userInfoRoleSaveBtn" data-action="saveUserRole">Zapisz rolę</button>
+                    <button type="button" class="btn btn-secondary" id="userInfoToggleActiveBtn" data-action="toggleUserActive">Zmień status</button>
+                  </div>
+                </div>
               </div>
             </div>
 

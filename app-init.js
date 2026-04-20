@@ -12,6 +12,7 @@ async function loadCatalogsFromSupabaseIntoState(options = {}) {
     stockEditMode: !!state.ui?.stockEditMode,
     pendingStockAdjustments: { ...(state.ui?.pendingStockAdjustments || {}) },
     showArchivedPartsInWarehouse: shouldShowArchivedPartsInWarehouse(),
+    showOnlyAlertsPartsInWarehouse: shouldShowOnlyAlertsPartsInWarehouse(),
     showArchivedMachinesInStock: shouldShowArchivedMachinesInStock()
   } : null;
 
@@ -23,6 +24,7 @@ async function loadCatalogsFromSupabaseIntoState(options = {}) {
     state.ui.stockEditMode = uiSnapshot.stockEditMode;
     state.ui.pendingStockAdjustments = uiSnapshot.pendingStockAdjustments;
     state.ui.showArchivedPartsInWarehouse = uiSnapshot.showArchivedPartsInWarehouse;
+    state.ui.showOnlyAlertsPartsInWarehouse = uiSnapshot.showOnlyAlertsPartsInWarehouse;
     state.ui.showArchivedMachinesInStock = uiSnapshot.showArchivedMachinesInStock;
   }
 
@@ -52,6 +54,7 @@ async function loadOperationalStateFromSupabaseIntoState(options = {}) {
     stockEditMode: !!state.ui?.stockEditMode,
     pendingStockAdjustments: { ...(state.ui?.pendingStockAdjustments || {}) },
     showArchivedPartsInWarehouse: shouldShowArchivedPartsInWarehouse(),
+    showOnlyAlertsPartsInWarehouse: shouldShowOnlyAlertsPartsInWarehouse(),
     showArchivedMachinesInStock: shouldShowArchivedMachinesInStock()
   } : null;
 
@@ -63,6 +66,7 @@ async function loadOperationalStateFromSupabaseIntoState(options = {}) {
     state.ui.stockEditMode = uiSnapshot.stockEditMode;
     state.ui.pendingStockAdjustments = uiSnapshot.pendingStockAdjustments;
     state.ui.showArchivedPartsInWarehouse = uiSnapshot.showArchivedPartsInWarehouse;
+    state.ui.showOnlyAlertsPartsInWarehouse = uiSnapshot.showOnlyAlertsPartsInWarehouse;
     state.ui.showArchivedMachinesInStock = uiSnapshot.showArchivedMachinesInStock;
   }
 
@@ -330,12 +334,21 @@ function initThresholdsToggle() {
 
 function initWarehouseArchiveToggles() {
   const partsToggle = document.getElementById("showArchivedPartsToggle");
+  const alertsToggle = document.getElementById("showOnlyAlertsPartsToggle");
   const machinesToggle = document.getElementById("showArchivedMachinesToggle");
 
   if (partsToggle) {
     partsToggle.checked = shouldShowArchivedPartsInWarehouse();
     partsToggle.addEventListener("change", (e) => {
       setShowArchivedPartsInWarehouse(!!e.target.checked);
+      renderWarehouse();
+    });
+  }
+
+  if (alertsToggle) {
+    alertsToggle.checked = shouldShowOnlyAlertsPartsInWarehouse();
+    alertsToggle.addEventListener("change", (e) => {
+      setShowOnlyAlertsPartsInWarehouse(!!e.target.checked);
       renderWarehouse();
     });
   }

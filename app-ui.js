@@ -466,15 +466,31 @@ function renderWarehouse() {
   const stockEditActions = document.getElementById("stockEditActions");
   const stockEditBanner = document.getElementById("stockEditBanner");
   const showArchivedToggle = document.getElementById("showArchivedPartsToggle");
+  const showOnlyAlertsToggle = document.getElementById("showOnlyAlertsPartsToggle");
   const isEditMode = !!state.ui?.stockEditMode;
   const pendingMap = state.ui?.pendingStockAdjustments || {};
   const showArchived = shouldShowArchivedPartsInWarehouse();
+  const showOnlyAlerts = shouldShowOnlyAlertsPartsInWarehouse();
 
   if (showArchivedToggle) showArchivedToggle.checked = showArchived;
+  if (showOnlyAlertsToggle) showOnlyAlertsToggle.checked = showOnlyAlerts;
 
   const summaryRows = computePartsSummary({ includeArchived: showArchived }).filter(item => {
-    if (!q) return true;
-    return String(item?.sku || '').toLowerCase().includes(q) || String(item?.name || '').toLowerCase().includes(q);
+    if (q) {
+      const matchesSearch = String(item?.sku || '').toLowerCase().includes(q) || String(item?.name || '').toLowerCase().includes(q);
+      if (!matchesSearch) return false;
+    }
+
+    if (!showOnlyAlerts) return true;
+
+    const pending = pendingMap[skuKey(item.sku)];
+    const effectiveQty = pending?.invalid === true
+      ? item.qty
+      : Number.isFinite(pending?.newQty)
+        ? safeQtyInt(pending.newQty)
+        : item.qty;
+    const statusMeta = getPartStockStatus(item.sku, effectiveQty);
+    return statusMeta.level === "warning" || statusMeta.level === "danger";
   });
   let grandTotal = 0;
 

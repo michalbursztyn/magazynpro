@@ -75,6 +75,7 @@ function ensureUiState() {
   if (typeof state.ui.stockEditMode !== "boolean") state.ui.stockEditMode = false;
   if (!state.ui.pendingStockAdjustments || typeof state.ui.pendingStockAdjustments !== "object") state.ui.pendingStockAdjustments = {};
   if (typeof state.ui.showArchivedPartsInWarehouse !== "boolean") state.ui.showArchivedPartsInWarehouse = true;
+  if (typeof state.ui.showOnlyAlertsPartsInWarehouse !== "boolean") state.ui.showOnlyAlertsPartsInWarehouse = false;
   if (typeof state.ui.showArchivedMachinesInStock !== "boolean") state.ui.showArchivedMachinesInStock = true;
 }
 
@@ -85,6 +86,7 @@ function serializeState() {
     currentBuild: state.currentBuild,
     ui: {
       showArchivedPartsInWarehouse: shouldShowArchivedPartsInWarehouse(),
+      showOnlyAlertsPartsInWarehouse: shouldShowOnlyAlertsPartsInWarehouse(),
       showArchivedMachinesInStock: shouldShowArchivedMachinesInStock()
     }
   };
@@ -129,6 +131,7 @@ function restoreState(data) {
 
   if (data.ui && typeof data.ui === "object") {
     state.ui.showArchivedPartsInWarehouse = data.ui.showArchivedPartsInWarehouse !== false;
+    state.ui.showOnlyAlertsPartsInWarehouse = data.ui.showOnlyAlertsPartsInWarehouse === true;
     state.ui.showArchivedMachinesInStock = data.ui.showArchivedMachinesInStock !== false;
   }
 
@@ -967,6 +970,11 @@ function shouldShowArchivedPartsInWarehouse() {
   return state.ui.showArchivedPartsInWarehouse !== false;
 }
 
+function shouldShowOnlyAlertsPartsInWarehouse() {
+  ensureUiState();
+  return state.ui.showOnlyAlertsPartsInWarehouse === true;
+}
+
 function shouldShowArchivedMachinesInStock() {
   ensureUiState();
   return state.ui.showArchivedMachinesInStock !== false;
@@ -975,6 +983,11 @@ function shouldShowArchivedMachinesInStock() {
 function setShowArchivedPartsInWarehouse(shouldShow) {
   ensureUiState();
   state.ui.showArchivedPartsInWarehouse = shouldShow !== false;
+}
+
+function setShowOnlyAlertsPartsInWarehouse(shouldShow) {
+  ensureUiState();
+  state.ui.showOnlyAlertsPartsInWarehouse = shouldShow === true;
 }
 
 function setShowArchivedMachinesInStock(shouldShow) {

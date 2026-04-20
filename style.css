@@ -1968,6 +1968,26 @@ input[type="range"]::-moz-range-thumb {
   max-width: 400px;
 }
 
+
+.history-card-header {
+  align-items: center;
+}
+
+.history-view-switch {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.history-toolbar .combo-select-host,
+.history-toolbar #historyAuthorFilter {
+  width: min(280px, 100%);
+}
+
+.history-toolbar .combo-select-host {
+  flex: 0 1 280px;
+  min-width: 220px;
+}
+
 .supplier-catalog-header {
   align-items: center;
 }
@@ -1998,6 +2018,19 @@ input[type="range"]::-moz-range-thumb {
 }
 
 @media (max-width: 900px) {
+  .history-card-header {
+    align-items: flex-start;
+  }
+
+  .history-view-switch {
+    margin-left: 0;
+  }
+
+  .history-toolbar .combo-select-host,
+  .history-toolbar #historyAuthorFilter {
+    width: 100%;
+  }
+
   .supplier-catalog-header {
     align-items: stretch;
     flex-direction: column;

@@ -170,8 +170,10 @@ function initHistoryViewToggle() {
 function initHistoryFilters() {
   const search = document.getElementById("historySearch");
   const date = document.getElementById("historyDateRange");
+  const author = document.getElementById("historyAuthorFilter");
   if (search) search.addEventListener("input", debounce(() => renderHistory(), 200));
   if (date) date.addEventListener("input", debounce(() => renderHistory(), 300));
+  if (author) author.addEventListener("change", () => renderHistory());
 }
 
 function initSidePanelSignals() {
@@ -1872,6 +1874,7 @@ async function init() {
     initComboFromSelect(document.getElementById("machineSelect"), { placeholder: "Wybierz maszynę..." });
     initComboFromSelect(document.getElementById("supplierEditorPartSelect"), { placeholder: "Wybierz część..." });
     initComboFromSelect(document.getElementById("bomSkuSelect"), { placeholder: "Wybierz część..." });
+    initComboFromSelect(document.getElementById("historyAuthorFilter"), { placeholder: "Wszyscy autorzy" });
 
     syncDeliveryDraftUI({ keepSelectedPart: true });
   } catch (e) {

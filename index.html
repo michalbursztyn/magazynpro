@@ -343,15 +343,23 @@
 
       <section class="tabPanel hidden" data-tab-panel="history">
         <div class="card">
-          <div class="cardHeader"><div><h2>Ostatnie akcje</h2><p class="text-secondary">Historia operacji</p></div></div>
-          <div class="toolbar">
-            <input type="text" id="historySearch" placeholder="Szukaj..." autocomplete="off" />
-            <input type="text" id="historyDateRange" placeholder="01.01.2026-02.01.2026" inputmode="numeric" autocomplete="off" style="max-width:200px" />
-            <div class="segmented" role="tablist" aria-label="Widok historii">
+          <div class="cardHeader history-card-header">
+            <div>
+              <h2>Ostatnie akcje</h2>
+              <p class="text-secondary">Historia operacji</p>
+            </div>
+            <div class="segmented history-view-switch" role="tablist" aria-label="Widok historii">
               <button type="button" id="historyViewDeliveriesBtn" class="active" role="tab" aria-selected="true">Dostawy</button>
               <button type="button" id="historyViewBuildsBtn" role="tab" aria-selected="false">Produkcje</button>
               <button type="button" id="historyViewAdjustmentsBtn" role="tab" aria-selected="false">Korekty</button>
             </div>
+          </div>
+          <div class="toolbar history-toolbar">
+            <input type="text" id="historySearch" placeholder="Szukaj..." autocomplete="off" />
+            <input type="text" id="historyDateRange" placeholder="01.01.2026-02.01.2026" inputmode="numeric" autocomplete="off" style="max-width:200px" />
+            <select id="historyAuthorFilter" aria-label="Filtruj po autorze">
+              <option value="">Wszyscy autorzy</option>
+            </select>
           </div>
           <div class="table-container">
             <table class="table-sticky" id="historyTable"><thead><tr><th>Data</th><th>Autor</th><th>Szczegóły</th><th class="text-right">Podgląd</th></tr></thead><tbody></tbody></table>

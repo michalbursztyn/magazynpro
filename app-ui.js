@@ -785,7 +785,66 @@ function parseHistoryDateRange(raw) {
   return { fromISO: null, toISO: null };
 }
 
-function historyMatchesFilters(ev, view, qNorm, fromISO, toISO) {
+function isMeaningfulHistoryAuthorName(value) {
+  const normalized = normalize(value);
+  if (!normalized) return false;
+  const simplified = normalized.toLowerCase();
+  return !["-", "—", "brak", "unknown", "nieznany", "nieznany autor"].includes(simplified);
+}
+
+function getHistoryAuthorMeta(ev) {
+  const authorUserId = normalize(ev?.authorUserId || "");
+  const authorName = normalize(ev?.authorName || "");
+  const authorEmail = normalize(ev?.authorEmail || "");
+  const hasName = isMeaningfulHistoryAuthorName(authorName);
+  const hasEmail = !!authorEmail;
+
+  let key = "unknown";
+  if (authorUserId) key = `user:${authorUserId}`;
+  else if (hasEmail) key = `email:${authorEmail.toLowerCase()}`;
+  else if (hasName) key = `name:${authorName.toLowerCase()}`;
+
+  let label = "Nieznany autor";
+  if (hasName) label = authorName;
+  else if (hasEmail) label = authorEmail;
+
+  const rank = hasName ? 3 : hasEmail ? 2 : 1;
+  return { key, label, rank };
+}
+
+function syncHistoryAuthorFilterOptions() {
+  const selectEl = document.getElementById("historyAuthorFilter");
+  if (!selectEl) return;
+
+  const previousValue = normalize(selectEl.value || "");
+  const optionsMap = new Map();
+
+  (state.history || []).forEach(ev => {
+    const meta = getHistoryAuthorMeta(ev);
+    const existing = optionsMap.get(meta.key);
+    if (!existing || meta.rank > existing.rank || (meta.rank === existing.rank && meta.label.localeCompare(existing.label, 'pl') < 0)) {
+      optionsMap.set(meta.key, meta);
+    }
+  });
+
+  const sortedOptions = Array.from(optionsMap.values()).sort((a, b) => {
+    if (a.rank !== b.rank) return b.rank - a.rank;
+    return String(a.label).localeCompare(String(b.label), 'pl');
+  });
+
+  selectEl.innerHTML = [
+    '<option value="">Wszyscy autorzy</option>',
+    ...sortedOptions.map(opt => `<option value="${escapeHtml(opt.key)}">${escapeHtml(opt.label)}</option>`)
+  ].join('');
+
+  selectEl.value = sortedOptions.some(opt => opt.key === previousValue) ? previousValue : '';
+
+  if (typeof refreshComboFromSelect === "function") {
+    try { refreshComboFromSelect(selectEl, { placeholder: "Wszyscy autorzy" }); } catch {}
+  }
+}
+
+function historyMatchesFilters(ev, view, qNorm, fromISO, toISO, authorKey) {
   if (!ev) return false;
   if (view === "deliveries" && ev.type !== "delivery") return false;
   if (view === "builds" && ev.type !== "build") return false;
@@ -794,6 +853,8 @@ function historyMatchesFilters(ev, view, qNorm, fromISO, toISO) {
   const d = ev.dateISO || "";
   if (fromISO && d && d < fromISO) return false;
   if (toISO && d && d > toISO) return false;
+
+  if (authorKey && getHistoryAuthorMeta(ev).key !== authorKey) return false;
 
   if (!qNorm) return true;
 
@@ -826,14 +887,18 @@ function renderHistory() {
   const view = getHistoryView();
   const searchInput = document.getElementById("historySearch");
   const dateInput = document.getElementById("historyDateRange");
-  
+  const authorSelect = document.getElementById("historyAuthorFilter");
+
+  syncHistoryAuthorFilterOptions();
+
   const qNorm = normalize(searchInput?.value || "").toLowerCase();
   const { fromISO, toISO } = parseHistoryDateRange(dateInput?.value || "");
+  const authorKey = normalize(authorSelect?.value || "");
 
   const rows = (state.history || [])
     .slice()
     .sort((a, b) => (b.ts || 0) - (a.ts || 0))
-    .filter(ev => historyMatchesFilters(ev, view, qNorm, fromISO, toISO));
+    .filter(ev => historyMatchesFilters(ev, view, qNorm, fromISO, toISO, authorKey));
 
   if (!rows.length) {
     const msg = (view === "deliveries")
@@ -904,7 +969,7 @@ function renderHistory() {
     return `
       <tr data-hid="${ev.id}">
         <td style="white-space:nowrap">${date}</td>
-        <td class="history-author-cell"><span class="history-author-value">${escapeHtml(ev.authorName || '—')}</span></td>
+        <td class="history-author-cell"><span class="history-author-value">${escapeHtml(getHistoryAuthorMeta(ev).label)}</span></td>
         <td>${summary}</td>
         <td class="text-right">
           <button class="btn btn-secondary btn-sm" type="button" 
@@ -920,7 +985,7 @@ function renderHistory() {
 function buildHistoryDetails(ev) {
   if (!ev) return "";
 
-  const authorLabel = escapeHtml(ev.authorName || '—');
+  const authorLabel = escapeHtml(getHistoryAuthorMeta(ev).label);
   const isDelivery = ev.type === "delivery";
   const isBuild = ev.type === "build";
   const isAdjustment = ev.type === "adjustment";

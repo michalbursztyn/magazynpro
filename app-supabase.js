@@ -1053,6 +1053,7 @@ function mapDbHistoryRowToUi(row = {}, author = null) {
       authorUserId,
       dateISO,
       supplier: String(payload?.supplier || '-').trim() || '-',
+      invoiceNumber: String((payload?.invoice_number ?? payload?.invoiceNumber ?? '')).trim() || null,
       items: (Array.isArray(payload?.items) ? payload.items : []).map(item => ({
         sku: String(item?.sku || '').trim(),
         name: String(item?.name || '').trim(),
@@ -1245,12 +1246,14 @@ window.saveDeliveryToSupabase = async function saveDeliveryToSupabase(payload = 
   const supplier = supplierName ? lookups.suppliersByName.get(supplierName) || null : null;
   const items = Array.isArray(payload?.items) ? payload.items : [];
   const dateISO = String(payload?.dateISO || '').trim();
+  const invoiceNumber = String(payload?.invoiceNumber || '').trim();
   const receivedAt = dateISO ? `${dateISO}T00:00:00Z` : null;
 
   if (!supplierName) throw new Error('Brak dostawcy dla dostawy.');
   if (!supplier?.id) throw new Error(`Nie znaleziono dostawcy "${supplierName}" w Supabase.`);
   if (!items.length) throw new Error('Brak pozycji dostawy do zapisania.');
   if (!receivedAt) throw new Error('Brak daty dostawy.');
+  if (!invoiceNumber) throw new Error('Brak numeru faktury dla dostawy.');
 
   const rpcItems = items.map(item => {
     const sku = String(item?.sku || '').trim().toLowerCase();
@@ -1268,7 +1271,8 @@ window.saveDeliveryToSupabase = async function saveDeliveryToSupabase(payload = 
     p_company_id: lookups.companyId,
     p_supplier_id: supplier.id,
     p_received_at: receivedAt,
-    p_items: rpcItems
+    p_items: rpcItems,
+    p_invoice_number: invoiceNumber
   });
 
   if (error) throw error;

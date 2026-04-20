@@ -27,7 +27,7 @@ const state = {
   partsCatalog: new Map(),
   suppliers: new Map(),
   machineCatalog: [],
-  currentDelivery: { supplier: null, dateISO: "", items: [] },
+  currentDelivery: { supplier: null, dateISO: "", invoiceNumber: "", items: [] },
   currentBuild: { dateISO: "", items: [] },
   history: [],
   ui: {
@@ -102,6 +102,7 @@ function restoreState(data) {
   state.currentDelivery = {
     supplier: normalize(rawCurrentDelivery.supplier) || null,
     dateISO: normalize(rawCurrentDelivery.dateISO),
+    invoiceNumber: normalize(rawCurrentDelivery.invoiceNumber),
     items: []
   };
   state.currentDelivery.items = asArr(rawCurrentDelivery.items).map(i => ({
@@ -655,6 +656,10 @@ function addToDelivery(supplier, skuRaw, qty, price) {
   if (dateInput) {
     state.currentDelivery.dateISO = normalize(dateInput.value);
   }
+  const invoiceInput = document.getElementById("deliveryInvoiceNumber");
+  if (invoiceInput) {
+    state.currentDelivery.invoiceNumber = normalize(invoiceInput.value);
+  }
 
   state.currentDelivery.items.push({
     id: nextId(),
@@ -677,8 +682,12 @@ async function finalizeDelivery() {
   
   try {
     const dateInput = document.getElementById("deliveryDate");
+    const invoiceInput = document.getElementById("deliveryInvoiceNumber");
     if (dateInput) {
       state.currentDelivery.dateISO = dateInput.value;
+    }
+    if (invoiceInput) {
+      state.currentDelivery.invoiceNumber = normalize(invoiceInput.value);
     }
 
     const d = state.currentDelivery;
@@ -689,6 +698,11 @@ async function finalizeDelivery() {
     if (!d.dateISO) {
       toast("Brak daty", "Podaj datę dostawy.", "warning");
       dateInput?.focus();
+      return;
+    }
+    if (!normalize(d.invoiceNumber)) {
+      toast("Brak numeru faktury", "Podaj numer faktury dla całej dostawy.", "warning");
+      invoiceInput?.focus();
       return;
     }
     
@@ -703,6 +717,7 @@ async function finalizeDelivery() {
     const payload = {
       supplier: normalize(d.supplier),
       dateISO: d.dateISO,
+      invoiceNumber: normalize(d.invoiceNumber),
       items: d.items.map(it => ({
         sku: normalize(it.sku),
         name: normalize(it.name),
@@ -717,7 +732,9 @@ async function finalizeDelivery() {
     state.currentDelivery.items = [];
     state.currentDelivery.supplier = null;
     state.currentDelivery.dateISO = "";
+    state.currentDelivery.invoiceNumber = "";
     if (dateInput) dateInput.value = "";
+    if (invoiceInput) invoiceInput.value = "";
 
     save();
     renderDelivery();

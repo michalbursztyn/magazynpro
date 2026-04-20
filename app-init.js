@@ -567,6 +567,7 @@ function syncDeliveryDraftUI(opts = {}) {
   const { keepSelectedPart = true } = opts;
   const supplierSelect = document.getElementById('supplierSelect');
   const dateInput = document.getElementById('deliveryDate');
+  const invoiceInput = document.getElementById('deliveryInvoiceNumber');
   if (!supplierSelect) return;
 
   const supplierNames = getActiveSupplierNames();
@@ -590,6 +591,12 @@ function syncDeliveryDraftUI(opts = {}) {
     const draftDate = normalize(state.currentDelivery?.dateISO) || today;
     dateInput.value = draftDate;
     state.currentDelivery.dateISO = draftDate;
+  }
+
+  if (invoiceInput) {
+    const draftInvoiceNumber = normalize(state.currentDelivery?.invoiceNumber);
+    invoiceInput.value = draftInvoiceNumber;
+    state.currentDelivery.invoiceNumber = draftInvoiceNumber;
   }
 
   rebuildDeliveryPartSelect(draftSupplier, { keepExistingIfPossible: keepSelectedPart });
@@ -1983,10 +1990,26 @@ async function init() {
     deliveryDate.addEventListener("input", (e) => {
       state.currentDelivery.dateISO = normalize(e.target.value);
       save();
+      renderDelivery();
     });
     deliveryDate.addEventListener("change", (e) => {
       state.currentDelivery.dateISO = normalize(e.target.value);
       save();
+      renderDelivery();
+    });
+  }
+
+  const deliveryInvoiceNumber = document.getElementById("deliveryInvoiceNumber");
+  if (deliveryInvoiceNumber) {
+    deliveryInvoiceNumber.addEventListener("input", (e) => {
+      state.currentDelivery.invoiceNumber = normalize(e.target.value);
+      save();
+      renderDelivery();
+    });
+    deliveryInvoiceNumber.addEventListener("change", (e) => {
+      state.currentDelivery.invoiceNumber = normalize(e.target.value);
+      save();
+      renderDelivery();
     });
   }
 
@@ -2095,6 +2118,11 @@ document.getElementById("addDeliveryItemBtn")?.addEventListener("click", () => {
   const deliveryDateInput = document.getElementById("deliveryDate");
   if (deliveryDateInput) {
     state.currentDelivery.dateISO = normalize(deliveryDateInput.value);
+  }
+
+  const deliveryInvoiceInput = document.getElementById("deliveryInvoiceNumber");
+  if (deliveryInvoiceInput) {
+    state.currentDelivery.invoiceNumber = normalize(deliveryInvoiceInput.value);
   }
 
   if (btn) btn.dataset.busy = "1";

@@ -615,10 +615,13 @@ function renderDelivery() {
   const itemsCountEl = document.getElementById("itemsCount");
   const itemsTotalEl = document.getElementById("itemsTotal");
   const finalizeBtn = document.getElementById("finalizeDeliveryBtn");
+  const hasSupplier = !!normalize(state.currentDelivery?.supplier);
+  const hasDate = !!normalize(state.currentDelivery?.dateISO);
+  const hasInvoiceNumber = !!normalize(state.currentDelivery?.invoiceNumber);
   
   if (itemsCountEl) itemsCountEl.textContent = String(items.length);
   if (itemsTotalEl) itemsTotalEl.textContent = fmtPLN.format(total);
-  if (finalizeBtn) finalizeBtn.disabled = items.length === 0;
+  if (finalizeBtn) finalizeBtn.disabled = items.length === 0 || !hasSupplier || !hasDate || !hasInvoiceNumber;
 }
 
 
@@ -877,7 +880,8 @@ function historyMatchesFilters(ev, view, qNorm, fromISO, toISO, authorKey) {
 
   if (view === "deliveries") {
     const supplier = normalize(ev.supplier || "").toLowerCase();
-    if (supplier.includes(qNorm)) return true;
+    const invoiceNumber = normalize(ev.invoiceNumber || "").toLowerCase();
+    if (supplier.includes(qNorm) || invoiceNumber.includes(qNorm)) return true;
 
     const items = Array.isArray(ev.items) ? ev.items : [];
     for (const it of items) {
@@ -890,7 +894,8 @@ function historyMatchesFilters(ev, view, qNorm, fromISO, toISO, authorKey) {
 
   if (ev.type === "delivery") {
     const supplier = normalize(ev.supplier || "").toLowerCase();
-    if (supplier.includes(qNorm)) return true;
+    const invoiceNumber = normalize(ev.invoiceNumber || "").toLowerCase();
+    if (supplier.includes(qNorm) || invoiceNumber.includes(qNorm)) return true;
   }
 
   const items = Array.isArray(ev.items) ? ev.items : [];
@@ -1132,6 +1137,7 @@ function buildHistoryDetails(ev) {
   if (isDelivery) {
     const total = items.reduce((s, i) => s + (safeFloat(i.price) * safeInt(i.qty)), 0);
     const totalQty = items.reduce((s, i) => s + safeInt(i.qty), 0);
+    const invoiceNumber = normalize(ev.invoiceNumber || "");
 
     return `
       <div class="history-modal-head">
@@ -1143,10 +1149,14 @@ function buildHistoryDetails(ev) {
         </div>
       </div>
 
-      <div class="history-modal-stats history-modal-stats-3">
+      <div class="history-modal-stats history-modal-stats-4">
         <div class="history-stat-card">
           <span class="history-stat-label">Dostawca</span>
           <strong class="history-stat-value">${escapeHtml(ev.supplier || "—")}</strong>
+        </div>
+        <div class="history-stat-card">
+          <span class="history-stat-label">Numer faktury</span>
+          <strong class="history-stat-value">${escapeHtml(invoiceNumber || "—")}</strong>
         </div>
         <div class="history-stat-card">
           <span class="history-stat-label">Pozycji / sztuk</span>

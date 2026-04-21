@@ -632,6 +632,76 @@ const APP_TAB_ACCESS_FALLBACK = {
   worker: ["parts", "delivery", "build", "machines"]
 };
 
+const APP_FEATURE_PERMISSIONS = Object.freeze([
+  {
+    key: 'company_thresholds_manage',
+    tabId: 'parts',
+    label: 'Progi firmy',
+    description: 'Globalne progi ostrzeżeń dla firmy.'
+  },
+  {
+    key: 'stock_adjustments_manage',
+    tabId: 'parts',
+    label: 'Korekty stanów',
+    description: 'Ręczne korekty stanów magazynowych części.'
+  },
+  {
+    key: 'users_manage',
+    tabId: 'users',
+    label: 'Zarządzanie użytkownikami',
+    description: 'Tworzenie użytkownika, zmiana roli i aktywacja/dezaktywacja.'
+  },
+  {
+    key: 'users_permissions_manage',
+    tabId: 'users',
+    label: 'Uprawnienia ról',
+    description: 'Konfiguracja uprawnień ról w obrębie firmy.'
+  },
+  {
+    key: 'suppliers_create',
+    tabId: 'catalog_suppliers',
+    label: 'Dodawanie',
+    description: 'Tworzenie nowych dostawców.'
+  },
+  {
+    key: 'suppliers_edit',
+    tabId: 'catalog_suppliers',
+    label: 'Edycja i archiwizacja',
+    description: 'Edycja dostawców, cenników oraz archiwizacja i przywracanie.'
+  },
+  {
+    key: 'parts_create',
+    tabId: 'catalog_parts',
+    label: 'Dodawanie',
+    description: 'Tworzenie nowych części w katalogu.'
+  },
+  {
+    key: 'parts_edit',
+    tabId: 'catalog_parts',
+    label: 'Edycja i archiwizacja',
+    description: 'Edycja istniejących części oraz archiwizacja i przywracanie.'
+  },
+  {
+    key: 'machines_create',
+    tabId: 'catalog_machines',
+    label: 'Dodawanie',
+    description: 'Tworzenie nowych maszyn w katalogu.'
+  },
+  {
+    key: 'machines_edit',
+    tabId: 'catalog_machines',
+    label: 'Edycja, BOM i archiwizacja',
+    description: 'Edycja maszyn, BOM oraz archiwizacja i przywracanie.'
+  }
+]);
+
+const APP_FEATURE_PERMISSION_KEYS = APP_FEATURE_PERMISSIONS.map(feature => feature.key);
+const APP_FEATURES_BY_TAB = APP_FEATURE_PERMISSIONS.reduce((acc, feature) => {
+  if (!acc[feature.tabId]) acc[feature.tabId] = [];
+  acc[feature.tabId].push(feature);
+  return acc;
+}, {});
+
 let currentActiveTab = "parts";
 window.companyUsersState = window.companyUsersState || {
   items: [],
@@ -657,6 +727,14 @@ function isCurrentCompanyOwner() {
 
 function getPermissionTabDefinitions() {
   return APP_TABS.slice();
+}
+
+function getPermissionFeatureDefinitions() {
+  return APP_FEATURE_PERMISSIONS.slice();
+}
+
+function getFeaturesForTab(tabId) {
+  return Array.isArray(APP_FEATURES_BY_TAB[tabId]) ? APP_FEATURES_BY_TAB[tabId].slice() : [];
 }
 
 function getDefaultTabPermissionsForRole(role) {
@@ -688,6 +766,56 @@ function normalizeRoleTabPermissions(role, rawPermissions) {
   return normalized;
 }
 
+function getDefaultFeaturePermissionsForRole(role, tabPermissionsOverride) {
+  const normalizedRole = String(role || '').trim().toLowerCase();
+  const tabPermissions = normalizeRoleTabPermissions(normalizedRole, tabPermissionsOverride);
+  const normalized = {};
+
+  APP_FEATURE_PERMISSIONS.forEach(feature => {
+    normalized[feature.key] = normalizedRole === 'owner' ? true : !!tabPermissions[feature.tabId];
+  });
+
+  return normalized;
+}
+
+function normalizeRoleFeaturePermissions(role, rawPermissions, tabPermissionsOverride) {
+  const normalizedRole = String(role || '').trim().toLowerCase();
+  if (normalizedRole === 'owner') return getDefaultFeaturePermissionsForRole('owner', getDefaultTabPermissionsForRole('owner'));
+
+  const fallback = getDefaultFeaturePermissionsForRole(normalizedRole, tabPermissionsOverride);
+  const source = rawPermissions && typeof rawPermissions === 'object' ? rawPermissions : {};
+  const normalized = {};
+
+  APP_FEATURE_PERMISSIONS.forEach(feature => {
+    if (Object.prototype.hasOwnProperty.call(source, feature.key)) {
+      normalized[feature.key] = !!source[feature.key];
+    } else {
+      normalized[feature.key] = !!fallback[feature.key];
+    }
+  });
+
+  return normalized;
+}
+
+function normalizeRolePermissionsDraft(role, rawDraft) {
+  const normalizedRole = String(role || '').trim().toLowerCase();
+  const source = rawDraft && typeof rawDraft === 'object' ? rawDraft : {};
+  const inferredTabSource = source?.tab_permissions && typeof source.tab_permissions === 'object'
+    ? source.tab_permissions
+    : source;
+  const tab_permissions = normalizeRoleTabPermissions(normalizedRole, inferredTabSource);
+  const feature_permissions = normalizeRoleFeaturePermissions(
+    normalizedRole,
+    source?.feature_permissions,
+    tab_permissions
+  );
+
+  return {
+    tab_permissions,
+    feature_permissions
+  };
+}
+
 function getStoredRolePermissions(role) {
   const normalizedRole = String(role || '').trim().toLowerCase();
   const st = window.companyRolePermissionsState || {};
@@ -695,15 +823,40 @@ function getStoredRolePermissions(role) {
   return items[normalizedRole] || null;
 }
 
-function getRoleTabPermissions(role) {
+function getRolePermissionsDraft(role) {
   const normalizedRole = String(role || '').trim().toLowerCase();
-  if (normalizedRole === 'owner') return getDefaultTabPermissionsForRole('owner');
+  if (normalizedRole === 'owner') {
+    return {
+      tab_permissions: getDefaultTabPermissionsForRole('owner'),
+      feature_permissions: getDefaultFeaturePermissionsForRole('owner')
+    };
+  }
 
   const draft = window.companyRolePermissionsState?.drafts?.[normalizedRole];
-  if (draft && typeof draft === 'object') return normalizeRoleTabPermissions(normalizedRole, draft);
+  if (draft && typeof draft === 'object') return normalizeRolePermissionsDraft(normalizedRole, draft);
 
   const stored = getStoredRolePermissions(normalizedRole);
-  return normalizeRoleTabPermissions(normalizedRole, stored?.tab_permissions);
+  return normalizeRolePermissionsDraft(normalizedRole, {
+    tab_permissions: stored?.tab_permissions,
+    feature_permissions: stored?.feature_permissions
+  });
+}
+
+function getRoleTabPermissions(role) {
+  return getRolePermissionsDraft(role).tab_permissions;
+}
+
+function getRoleFeaturePermissions(role) {
+  return getRolePermissionsDraft(role).feature_permissions;
+}
+
+function isRoleFeatureEffectivelyEnabled(role, featureKey) {
+  const feature = APP_FEATURE_PERMISSIONS.find(item => item.key === String(featureKey || '').trim());
+  if (!feature) return false;
+  const tabPermissions = getRoleTabPermissions(role);
+  if (!tabPermissions[feature.tabId]) return false;
+  const featurePermissions = getRoleFeaturePermissions(role);
+  return !!featurePermissions[feature.key];
 }
 
 function getAllowedTabsForRole(role) {
@@ -732,10 +885,12 @@ function normalizeRolePermissionsCollection(rawItems) {
   Object.values(source).forEach(row => {
     const role = String(row?.role || '').trim().toLowerCase();
     if (!role) return;
+    const tab_permissions = normalizeRoleTabPermissions(role, row?.tab_permissions);
     normalizedItems[role] = {
       ...row,
       role,
-      tab_permissions: normalizeRoleTabPermissions(role, row?.tab_permissions)
+      tab_permissions,
+      feature_permissions: normalizeRoleFeaturePermissions(role, row?.feature_permissions, tab_permissions)
     };
   });
 
@@ -818,10 +973,42 @@ function toggleRolePermissionDraft(role, tabId) {
   if (!APP_TABS.some(tab => tab.id === normalizedTabId)) return;
 
   const st = window.companyRolePermissionsState || (window.companyRolePermissionsState = {});
-  const current = getRoleTabPermissions(normalizedRole);
-  const next = { ...current, [normalizedTabId]: !current[normalizedTabId] };
+  const current = getRolePermissionsDraft(normalizedRole);
+  const next = {
+    tab_permissions: {
+      ...current.tab_permissions,
+      [normalizedTabId]: !current.tab_permissions[normalizedTabId]
+    },
+    feature_permissions: {
+      ...current.feature_permissions
+    }
+  };
   st.drafts = st.drafts || {};
   st.drafts[normalizedRole] = next;
+  renderUsersAdmin();
+}
+
+function toggleRoleFeaturePermissionDraft(role, featureKey) {
+  const normalizedRole = String(role || '').trim().toLowerCase();
+  const normalizedFeatureKey = String(featureKey || '').trim();
+  const feature = APP_FEATURE_PERMISSIONS.find(item => item.key === normalizedFeatureKey);
+  if (!['admin', 'worker'].includes(normalizedRole)) return;
+  if (!feature) return;
+
+  const current = getRolePermissionsDraft(normalizedRole);
+  if (!current.tab_permissions[feature.tabId]) return;
+
+  const st = window.companyRolePermissionsState || (window.companyRolePermissionsState = {});
+  st.drafts = st.drafts || {};
+  st.drafts[normalizedRole] = {
+    tab_permissions: {
+      ...current.tab_permissions
+    },
+    feature_permissions: {
+      ...current.feature_permissions,
+      [normalizedFeatureKey]: !current.feature_permissions[normalizedFeatureKey]
+    }
+  };
   renderUsersAdmin();
 }
 
@@ -846,16 +1033,26 @@ async function saveRolePermissions(role) {
   }
 
   const st = window.companyRolePermissionsState || (window.companyRolePermissionsState = {});
-  const permissions = getRoleTabPermissions(normalizedRole);
+  const permissionsDraft = getRolePermissionsDraft(normalizedRole);
   st.saving = true;
 
   try {
-    const saved = await window.upsertCompanyRolePermissions?.(normalizedRole, permissions);
+    const saved = await window.upsertCompanyRolePermissions?.(
+      normalizedRole,
+      permissionsDraft.tab_permissions,
+      permissionsDraft.feature_permissions
+    );
+    const savedTabPermissions = normalizeRoleTabPermissions(normalizedRole, saved?.tab_permissions || permissionsDraft.tab_permissions);
     st.items = st.items || {};
     st.items[normalizedRole] = {
       ...saved,
       role: normalizedRole,
-      tab_permissions: normalizeRoleTabPermissions(normalizedRole, saved?.tab_permissions || permissions)
+      tab_permissions: savedTabPermissions,
+      feature_permissions: normalizeRoleFeaturePermissions(
+        normalizedRole,
+        saved?.feature_permissions || permissionsDraft.feature_permissions,
+        savedTabPermissions
+      )
     };
     if (st.drafts && Object.prototype.hasOwnProperty.call(st.drafts, normalizedRole)) {
       delete st.drafts[normalizedRole];
@@ -885,7 +1082,9 @@ function renderRolePermissionsPanel() {
     : 'owner';
   const isOwner = isCurrentCompanyOwner();
   const isEditableRole = isOwner && ['admin', 'worker'].includes(selectedRole);
-  const effectivePermissions = getRoleTabPermissions(selectedRole);
+  const permissionsDraft = getRolePermissionsDraft(selectedRole);
+  const effectivePermissions = permissionsDraft.tab_permissions;
+  const featurePermissions = permissionsDraft.feature_permissions;
   const enabledCount = Object.values(effectivePermissions).filter(Boolean).length;
   const totalCount = APP_TABS.length;
 
@@ -917,41 +1116,73 @@ function renderRolePermissionsPanel() {
 
   const roleLabel = selectedRole === 'admin' ? 'Administrator' : 'Pracownik';
   const hasDraft = !!st.drafts?.[selectedRole];
+  const enabledFeatureCount = APP_FEATURE_PERMISSIONS.filter(feature => isRoleFeatureEffectivelyEnabled(selectedRole, feature.key)).length;
+  const totalFeatureCount = APP_FEATURE_PERMISSIONS.length;
 
   root.innerHTML = `
     <div class="role-permissions-summary">
       <div>
         <strong>${roleLabel}</strong>
-        <div class="text-secondary" style="font-size:var(--text-sm)">Włączasz albo wyłączasz widoczność i wejście do zakładek dla roli ${escapeHtml(selectedRole)}.</div>
+        <div class="text-secondary" style="font-size:var(--text-sm)">Duża karta steruje całą zakładką. Małe chipy w środku sterują dodatkowymi funkcjami tej zakładki.</div>
       </div>
-      <div style="display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap">
+      <div class="role-permissions-summary-metrics">
         ${hasDraft ? '<span class="badge badge-warning">Niezapisane zmiany</span>' : '<span class="badge badge-success">Zapisane</span>'}
-        <strong>${enabledCount} / ${totalCount}</strong>
+        <strong>Zakładki: ${enabledCount} / ${totalCount}</strong>
+        <strong>Funkcje: ${enabledFeatureCount} / ${totalFeatureCount}</strong>
       </div>
     </div>
     <div class="role-permissions-grid">
       ${APP_TABS.map(tab => {
         const enabled = !!effectivePermissions[tab.id];
+        const features = getFeaturesForTab(tab.id);
+        const featureTiles = features.length
+          ? `
+            <div class="role-permission-feature-list" aria-label="Funkcje dla zakładki ${escapeHtml(tab.label)}">
+              ${features.map(feature => {
+                const rawEnabled = !!featurePermissions[feature.key];
+                const disabledByTab = !enabled;
+                const effectiveEnabled = enabled && rawEnabled;
+                return `
+                  <button
+                    type="button"
+                    class="role-feature-chip ${effectiveEnabled ? 'is-enabled' : 'is-disabled'} ${disabledByTab ? 'is-locked' : ''}"
+                    data-action="toggleRoleFeaturePermission"
+                    data-role="${escapeHtml(selectedRole)}"
+                    data-feature-key="${escapeHtml(feature.key)}"
+                    title="${escapeHtml(feature.description)}"
+                    ${isEditableRole && !disabledByTab ? '' : 'disabled'}>
+                    <span class="role-feature-chip-label">${escapeHtml(feature.label)}</span>
+                    <span class="role-feature-chip-state">${disabledByTab ? 'Wyłączone z kartą' : (rawEnabled ? 'Włączona' : 'Wyłączona')}</span>
+                  </button>
+                `;
+              }).join('')}
+            </div>
+          `
+          : '<div class="role-permission-feature-empty">Brak dodatkowych funkcji w tej zakładce.</div>';
         return `
-          <button
-            type="button"
-            class="role-permission-tile ${enabled ? 'is-enabled' : 'is-disabled'}"
-            data-action="toggleRolePermissionTile"
-            data-role="${escapeHtml(selectedRole)}"
-            data-tab-id="${escapeHtml(tab.id)}"
-            ${isEditableRole ? '' : 'disabled'}>
-            <div class="role-permission-tile-head">
+          <div class="role-permission-tile ${enabled ? 'is-enabled' : 'is-disabled'}">
+            <button
+              type="button"
+              class="role-permission-tile-toggle"
+              data-action="toggleRolePermissionTile"
+              data-role="${escapeHtml(selectedRole)}"
+              data-tab-id="${escapeHtml(tab.id)}"
+              aria-label="Przełącz zakładkę ${escapeHtml(tab.label)}"
+              aria-pressed="${enabled ? 'true' : 'false'}"
+              ${isEditableRole ? '' : 'disabled'}></button>
+            <div class="role-permission-tile-head role-permission-tile-static">
               <div class="role-permission-tile-title">
                 <strong>${escapeHtml(tab.label)}</strong>
                 <span>${escapeHtml(tab.description)}</span>
               </div>
               <span class="status-pill status-pill-${enabled ? 'success' : 'warning'}">${enabled ? 'Aktywna' : 'Wyłączona'}</span>
             </div>
-            <div class="role-permission-tile-foot">
+            ${featureTiles}
+            <div class="role-permission-tile-foot role-permission-tile-static">
               <span>${escapeHtml(tab.id)}</span>
-              <span>${isEditableRole ? 'Kliknij, aby przełączyć' : 'Tylko podgląd'}</span>
+              <span>${isEditableRole ? 'Kliknij kartę lub chipy' : 'Tylko podgląd'}</span>
             </div>
-          </button>
+          </div>
         `;
       }).join('')}
     </div>
@@ -1368,6 +1599,20 @@ function bindUserManagementUI() {
     const roleSwitchBtn = e.target?.closest?.('[data-role-permissions-role]');
     if (roleSwitchBtn) {
       setRolePermissionsEditorRole(roleSwitchBtn.getAttribute('data-role-permissions-role'));
+      return;
+    }
+
+    const toggleFeatureBtn = e.target?.closest?.('[data-action="toggleRoleFeaturePermission"]');
+    if (toggleFeatureBtn) {
+      e.stopPropagation();
+      if (!isCurrentCompanyOwner()) {
+        toast('Brak dostępu', 'Tylko owner może zmieniać konfigurację ról.', 'warning');
+        return;
+      }
+      toggleRoleFeaturePermissionDraft(
+        toggleFeatureBtn.getAttribute('data-role'),
+        toggleFeatureBtn.getAttribute('data-feature-key')
+      );
       return;
     }
 

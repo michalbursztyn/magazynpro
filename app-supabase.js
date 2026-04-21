@@ -255,7 +255,7 @@ window.fetchCompanyRolePermissions = async function fetchCompanyRolePermissions(
 
   const { data, error } = await window.sb
     .from("company_role_permissions")
-    .select("id, company_id, role, tab_permissions, created_at, updated_at")
+    .select("id, company_id, role, tab_permissions, feature_permissions, created_at, updated_at")
     .eq("company_id", companyId)
     .order("role", { ascending: true });
 
@@ -263,7 +263,7 @@ window.fetchCompanyRolePermissions = async function fetchCompanyRolePermissions(
   return Array.isArray(data) ? data : [];
 };
 
-window.upsertCompanyRolePermissions = async function upsertCompanyRolePermissions(role, tabPermissions = {}, companyIdOverride) {
+window.upsertCompanyRolePermissions = async function upsertCompanyRolePermissions(role, tabPermissions = {}, featurePermissions = {}, companyIdOverride) {
   if (!window.sb) throw new Error("Brak klienta Supabase.");
 
   const companyId = companyIdOverride || window.appAuth?.companyId;
@@ -276,13 +276,14 @@ window.upsertCompanyRolePermissions = async function upsertCompanyRolePermission
   const payload = {
     company_id: companyId,
     role: normalizedRole,
-    tab_permissions: { ...(tabPermissions || {}) }
+    tab_permissions: { ...(tabPermissions || {}) },
+    feature_permissions: { ...(featurePermissions || {}) }
   };
 
   const { data, error } = await window.sb
     .from("company_role_permissions")
     .upsert(payload, { onConflict: "company_id,role" })
-    .select("id, company_id, role, tab_permissions, created_at, updated_at")
+    .select("id, company_id, role, tab_permissions, feature_permissions, created_at, updated_at")
     .maybeSingle();
 
   if (error) throw error;

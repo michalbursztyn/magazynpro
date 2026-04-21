@@ -3309,6 +3309,14 @@ body.user-info-open {
   color: var(--text);
 }
 
+.role-permissions-summary-metrics {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
 .role-permissions-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -3316,18 +3324,18 @@ body.user-info-open {
 }
 
 .role-permission-tile {
+  position: relative;
   display: grid;
   gap: var(--space-3);
   align-content: start;
   text-align: left;
   width: 100%;
-  min-height: 148px;
+  min-height: 188px;
   padding: var(--space-4);
   background: var(--surface-1);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   color: var(--text);
-  cursor: pointer;
   transition: border-color var(--trans-fast), background var(--trans-fast), transform var(--trans-fast), box-shadow var(--trans-fast);
 }
 
@@ -3346,9 +3354,32 @@ body.user-info-open {
   opacity: 0.92;
 }
 
-.role-permission-tile:disabled {
+.role-permission-tile-toggle {
+  position: absolute;
+  inset: 0;
+  border: none;
+  border-radius: inherit;
+  background: transparent;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.role-permission-tile-toggle:hover {
+  background: transparent;
+}
+
+.role-permission-tile-toggle:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+
+.role-permission-tile-toggle:disabled {
   cursor: default;
-  transform: none;
+}
+
+.role-permission-tile-static {
+  position: relative;
+  z-index: 2;
+  pointer-events: none;
 }
 
 .role-permission-tile-head {
@@ -3372,6 +3403,82 @@ body.user-info-open {
   font-size: var(--text-sm);
   color: var(--text-secondary);
   line-height: 1.45;
+}
+
+.role-permission-feature-list {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: stretch;
+}
+
+.role-feature-chip {
+  display: inline-flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-width: 0;
+  flex: 1 1 220px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color var(--trans-fast), background var(--trans-fast), opacity var(--trans-fast), transform var(--trans-fast);
+}
+
+.role-feature-chip:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--border-strong);
+}
+
+.role-feature-chip.is-enabled {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.38);
+}
+
+.role-feature-chip.is-disabled {
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.role-feature-chip.is-locked {
+  opacity: 0.55;
+}
+
+.role-feature-chip:disabled {
+  cursor: default;
+  transform: none;
+}
+
+.role-feature-chip-label {
+  display: block;
+  min-width: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--text);
+}
+
+.role-feature-chip-state {
+  flex: 0 0 auto;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.role-permission-feature-empty {
+  position: relative;
+  z-index: 2;
+  pointer-events: none;
+  padding: var(--space-3);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-tertiary);
+  font-size: var(--text-sm);
 }
 
 .role-permission-tile-foot {
@@ -3413,6 +3520,10 @@ body.user-info-open {
   .role-permissions-grid {
     grid-template-columns: 1fr;
   }
+
+  .role-feature-chip {
+    flex-basis: 100%;
+  }
 }
 
 @media (max-width: 980px) {
@@ -3425,6 +3536,11 @@ body.user-info-open {
   .user-info-summary-grid,
   .user-info-form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .role-permissions-summary-metrics {
+    width: 100%;
+    justify-content: flex-start;
   }
 
   .user-row-actions-clean,

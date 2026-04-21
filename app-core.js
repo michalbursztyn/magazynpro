@@ -1124,6 +1124,13 @@ function getPendingStockAdjustmentsCount() {
 }
 
 function beginStockEditMode() {
+  if (typeof canManageStockAdjustments === 'function' && !canManageStockAdjustments()) {
+    ensureUiState();
+    state.ui.stockEditMode = false;
+    state.ui.pendingStockAdjustments = {};
+    renderWarehouse();
+    return;
+  }
   ensureUiState();
   state.ui.stockEditMode = true;
   state.ui.pendingStockAdjustments = {};
@@ -1198,6 +1205,13 @@ function updatePendingStockAdjustment(skuRaw, rawValue) {
 }
 
 async function commitStockAdjustments() {
+  if (typeof canManageStockAdjustments === 'function' && !canManageStockAdjustments()) {
+    ensureUiState();
+    state.ui.stockEditMode = false;
+    state.ui.pendingStockAdjustments = {};
+    renderWarehouse();
+    return;
+  }
   if (_stockAdjustmentsBusy) {
     toast("Operacja w toku", "Korekty stanów są już zapisywane.", "warning");
     return;

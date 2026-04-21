@@ -419,6 +419,11 @@ function closePartEditorModal() {
 }
 
 function openNewPartPanel() {
+  if (!canCreateCatalogParts()) {
+    toast("Brak dostępu", "Nie masz uprawnienia do dodawania części.", "warning");
+    return;
+  }
+
   partEditorIsNew = true;
   currentEditPartKey = null;
   unsavedChanges.clear("partEditor");
@@ -608,6 +613,7 @@ function initNewPartToggle() {
   if (!btn) return;
 
   btn.textContent = "Nowa";
+  btn.classList.toggle("hidden", !canCreateCatalogParts());
   btn.addEventListener("click", openNewPartPanel);
   cancelBtn?.addEventListener("click", () => closeNewPartPanel({ clear: true }));
 }
@@ -872,6 +878,110 @@ function canAccessTab(tab, roleOverride) {
   return !!permissions[normalizedTab];
 }
 
+function getCurrentRolePermissionsRow(roleOverride) {
+  const role = String(roleOverride || getCurrentCompanyRole() || '').trim().toLowerCase();
+  if (!role) return null;
+  const items = window.appAuth?.rolePermissions && typeof window.appAuth.rolePermissions === 'object'
+    ? window.appAuth.rolePermissions
+    : {};
+  return items[role] || null;
+}
+
+function hasCurrentUserFeaturePermission(featureKey) {
+  const normalizedFeatureKey = String(featureKey || '').trim();
+  if (!normalizedFeatureKey) return false;
+  if (isCurrentCompanyOwner()) return true;
+
+  const role = getCurrentCompanyRole();
+  if (!role) return false;
+
+  const feature = APP_FEATURE_PERMISSIONS.find(item => item.key === normalizedFeatureKey);
+  if (!feature) return false;
+  if (!canAccessTab(feature.tabId, role)) return false;
+
+  const row = getCurrentRolePermissionsRow(role);
+  const rawFeaturePermissions = row?._rawFeaturePermissions && typeof row._rawFeaturePermissions === 'object'
+    ? row._rawFeaturePermissions
+    : row?.feature_permissions && typeof row.feature_permissions === 'object'
+      ? row.feature_permissions
+      : null;
+
+  if (!rawFeaturePermissions || !Object.prototype.hasOwnProperty.call(rawFeaturePermissions, normalizedFeatureKey)) {
+    return false;
+  }
+
+  return rawFeaturePermissions[normalizedFeatureKey] === true;
+}
+
+function canManageCompanyThresholds() {
+  return hasCurrentUserFeaturePermission('company_thresholds_manage');
+}
+
+function canManageStockAdjustments() {
+  return hasCurrentUserFeaturePermission('stock_adjustments_manage');
+}
+
+function canManageUsers() {
+  return hasCurrentUserFeaturePermission('users_manage');
+}
+
+function canManageUserPermissions() {
+  return hasCurrentUserFeaturePermission('users_permissions_manage');
+}
+
+function canCreateSuppliers() {
+  return hasCurrentUserFeaturePermission('suppliers_create');
+}
+
+function canEditSuppliers() {
+  return hasCurrentUserFeaturePermission('suppliers_edit');
+}
+
+function canCreateCatalogParts() {
+  return hasCurrentUserFeaturePermission('parts_create');
+}
+
+function canEditCatalogParts() {
+  return hasCurrentUserFeaturePermission('parts_edit');
+}
+
+function canCreateCatalogMachines() {
+  return hasCurrentUserFeaturePermission('machines_create');
+}
+
+function canEditCatalogMachines() {
+  return hasCurrentUserFeaturePermission('machines_edit');
+}
+
+function refreshCatalogFeatureAccessUI() {
+  const newPartBtn = document.getElementById('toggleNewPartBtn');
+  const newMachineBtn = document.getElementById('openMachineModalBtn');
+  const supplierAddRow = document.querySelector('.supplier-add-row');
+
+  if (newPartBtn) {
+    newPartBtn.classList.toggle('hidden', !canCreateCatalogParts());
+    newPartBtn.setAttribute('aria-hidden', canCreateCatalogParts() ? 'false' : 'true');
+  }
+
+  if (newMachineBtn) {
+    newMachineBtn.classList.toggle('hidden', !canCreateCatalogMachines());
+    newMachineBtn.setAttribute('aria-hidden', canCreateCatalogMachines() ? 'false' : 'true');
+  }
+
+  if (supplierAddRow) {
+    supplierAddRow.classList.toggle('hidden', !canCreateSuppliers());
+    supplierAddRow.setAttribute('aria-hidden', canCreateSuppliers() ? 'false' : 'true');
+  }
+}
+
+function enforceFeaturePermissionSafeStates() {
+  ensureUiState();
+  if (!canManageStockAdjustments() && state.ui?.stockEditMode) {
+    state.ui.stockEditMode = false;
+    state.ui.pendingStockAdjustments = {};
+  }
+}
+
 function getDefaultTabForRole(roleOverride) {
   const role = roleOverride || getCurrentCompanyRole();
   const allowed = getAllowedTabsForRole(role);
@@ -886,10 +996,16 @@ function normalizeRolePermissionsCollection(rawItems) {
     const role = String(row?.role || '').trim().toLowerCase();
     if (!role) return;
     const tab_permissions = normalizeRoleTabPermissions(role, row?.tab_permissions);
+    const rawFeaturePermissions = row?._rawFeaturePermissions && typeof row._rawFeaturePermissions === 'object'
+      ? { ...row._rawFeaturePermissions }
+      : row?.feature_permissions && typeof row.feature_permissions === 'object'
+        ? { ...row.feature_permissions }
+        : {};
     normalizedItems[role] = {
       ...row,
       role,
       tab_permissions,
+      _rawFeaturePermissions: rawFeaturePermissions,
       feature_permissions: normalizeRoleFeaturePermissions(role, row?.feature_permissions, tab_permissions)
     };
   });
@@ -1023,8 +1139,8 @@ function resetRolePermissionDraft(role) {
 
 async function saveRolePermissions(role) {
   const normalizedRole = String(role || '').trim().toLowerCase();
-  if (!isCurrentCompanyOwner()) {
-    toast('Brak dostępu', 'Tylko owner może zapisywać konfigurację ról.', 'warning');
+  if (!canManageUserPermissions()) {
+    toast('Brak dostępu', 'Nie masz uprawnienia do zapisu konfiguracji ról.', 'warning');
     return;
   }
   if (!['admin', 'worker'].includes(normalizedRole)) {
@@ -1080,15 +1196,24 @@ function renderRolePermissionsPanel() {
   const selectedRole = ['owner', 'admin', 'worker'].includes(String(st.selectedRole || '').trim().toLowerCase())
     ? String(st.selectedRole || '').trim().toLowerCase()
     : 'owner';
-  const isOwner = isCurrentCompanyOwner();
-  const isEditableRole = isOwner && ['admin', 'worker'].includes(selectedRole);
+  const canEditPermissions = canManageUserPermissions();
+  const isEditableRole = canEditPermissions && ['admin', 'worker'].includes(selectedRole);
   const permissionsDraft = getRolePermissionsDraft(selectedRole);
   const effectivePermissions = permissionsDraft.tab_permissions;
   const featurePermissions = permissionsDraft.feature_permissions;
   const enabledCount = Object.values(effectivePermissions).filter(Boolean).length;
   const totalCount = APP_TABS.length;
 
-  if (note) note.classList.toggle('hidden', isOwner);
+  if (note) {
+    note.classList.toggle('hidden', canEditPermissions);
+    if (!canEditPermissions) {
+      note.textContent = 'Nie masz uprawnienia do zmiany konfiguracji ról. Panel zostaje widoczny, ale tylko do podglądu.';
+    }
+  }
+
+  document.querySelectorAll('[data-role-permissions-role]').forEach(btn => {
+    btn.disabled = false;
+  });
   if (saveBtn) {
     saveBtn.disabled = !isEditableRole || !!st.saving;
     saveBtn.textContent = st.saving ? 'Zapisywanie...' : 'Zapisz konfigurację';
@@ -1253,7 +1378,9 @@ function refreshRoleAccessUI(opts = {}) {
     syncRolePermissionsStateFromAuth({ preserveError: true });
   }
 
+  enforceFeaturePermissionSafeStates();
   applyRoleAccess();
+  refreshCatalogFeatureAccessUI();
 
   if (opts.refreshActiveTab !== false) {
     setActiveTab(currentActiveTab || getDefaultTabForRole(), { skipRefresh: false });
@@ -1300,8 +1427,8 @@ function getCompanyUserAdminMeta(item) {
   const rowRole = String(item?.role || '').trim().toLowerCase();
   const isOwnerRow = rowRole === 'owner';
   const isSelf = !!currentUserId && item?.user_id === currentUserId;
-  const isOwner = isCurrentCompanyOwner();
-  const canModify = isOwner && !isOwnerRow && !isSelf;
+  const hasUsersManagePermission = canManageUsers();
+  const canModify = hasUsersManagePermission && !isOwnerRow && !isSelf;
   const statusCls = item?.is_active ? 'success' : 'warning';
   const statusLabel = item?.is_active ? 'Aktywny' : 'Nieaktywny';
   const actionLabel = item?.is_active ? 'Dezaktywuj użytkownika' : 'Aktywuj użytkownika';
@@ -1310,8 +1437,8 @@ function getCompanyUserAdminMeta(item) {
   const email = String(item?.email || '').trim() || '—';
 
   let readonlyMessage = '';
-  if (!isOwner) {
-    readonlyMessage = 'Tylko owner może zmieniać rolę i status użytkowników.';
+  if (!hasUsersManagePermission) {
+    readonlyMessage = 'Nie masz uprawnienia do zarządzania użytkownikami. Możesz tylko podejrzeć dane.';
   } else if (isOwnerRow) {
     readonlyMessage = 'Owner nie może być edytowany z tego poziomu. I bardzo dobrze.';
   } else if (isSelf) {
@@ -1420,8 +1547,8 @@ function renderUsersAdmin() {
     return;
   }
 
-  const isOwner = isCurrentCompanyOwner();
-  if (createBlock) createBlock.classList.toggle('hidden', !isOwner);
+  const hasUsersManagePermission = canManageUsers();
+  if (createBlock) createBlock.classList.toggle('hidden', !hasUsersManagePermission);
 
   const st = window.companyUsersState || { items: [], loading: false, error: '' };
   if (st.loading) {
@@ -1491,8 +1618,8 @@ function bindUserManagementUI() {
 
   document.getElementById('createWorkerBtn')?.addEventListener('click', async () => {
     if (!canAccessTab('users')) return;
-    if (!isCurrentCompanyOwner()) {
-      toast('Brak dostępu', 'Tylko owner może tworzyć nowych użytkowników.', 'warning');
+    if (!canManageUsers()) {
+      toast('Brak dostępu', 'Nie masz uprawnienia do tworzenia nowych użytkowników.', 'warning');
       return;
     }
 
@@ -1605,8 +1732,8 @@ function bindUserManagementUI() {
     const toggleFeatureBtn = e.target?.closest?.('[data-action="toggleRoleFeaturePermission"]');
     if (toggleFeatureBtn) {
       e.stopPropagation();
-      if (!isCurrentCompanyOwner()) {
-        toast('Brak dostępu', 'Tylko owner może zmieniać konfigurację ról.', 'warning');
+      if (!canManageUserPermissions()) {
+        toast('Brak dostępu', 'Nie masz uprawnienia do zmiany konfiguracji ról.', 'warning');
         return;
       }
       toggleRoleFeaturePermissionDraft(
@@ -1618,8 +1745,8 @@ function bindUserManagementUI() {
 
     const toggleTileBtn = e.target?.closest?.('[data-action="toggleRolePermissionTile"]');
     if (toggleTileBtn) {
-      if (!isCurrentCompanyOwner()) {
-        toast('Brak dostępu', 'Tylko owner może zmieniać konfigurację ról.', 'warning');
+      if (!canManageUserPermissions()) {
+        toast('Brak dostępu', 'Nie masz uprawnienia do zmiany konfiguracji ról.', 'warning');
         return;
       }
       toggleRolePermissionDraft(
@@ -1646,8 +1773,8 @@ function bindUserManagementUI() {
     const saveRoleBtn = e.target?.closest?.('[data-action="saveUserRole"]');
     if (saveRoleBtn) {
       if (!canAccessTab('users')) return;
-      if (!isCurrentCompanyOwner()) {
-        toast('Brak dostępu', 'Tylko owner może zmieniać role użytkowników.', 'warning');
+      if (!canManageUsers()) {
+        toast('Brak dostępu', 'Nie masz uprawnienia do zmiany roli użytkowników.', 'warning');
         return;
       }
       const memberId = saveRoleBtn.getAttribute('data-member-id');
@@ -1679,8 +1806,8 @@ function bindUserManagementUI() {
     const toggleActiveBtn = e.target?.closest?.('[data-action="toggleUserActive"]');
     if (toggleActiveBtn) {
       if (!canAccessTab('users')) return;
-      if (!isCurrentCompanyOwner()) {
-        toast('Brak dostępu', 'Tylko owner może zmieniać status użytkowników.', 'warning');
+      if (!canManageUsers()) {
+        toast('Brak dostępu', 'Nie masz uprawnienia do zmiany statusu użytkowników.', 'warning');
         return;
       }
       const memberId = toggleActiveBtn.getAttribute('data-member-id');
@@ -2143,6 +2270,8 @@ async function init() {
     renderUsersAdmin();
   }
 
+  enforceFeaturePermissionSafeStates();
+
   // Sync threshold UI
   const warnRange = document.getElementById("warnRange");
   const dangerRange = document.getElementById("dangerRange");
@@ -2182,6 +2311,10 @@ async function init() {
   };
 
   const saveThresholdsFromInputs = async () => {
+    if (!canManageCompanyThresholds()) {
+      syncThresholdInputsFromAuth();
+      return;
+    }
     if (!window.saveCompanyThresholdsToSupabase) return;
 
     const next = syncThresholdLabelsFromInputs();
@@ -2604,6 +2737,11 @@ document.getElementById("addPartBtn")?.addEventListener("click", async () => {
 });
 
 window.togglePartArchive = async (sku) => {
+  if (!canEditCatalogParts()) {
+    toast("Brak dostępu", "Nie masz uprawnienia do edycji i archiwizacji części.", "warning");
+    return;
+  }
+
   const part = state.partsCatalog.get(skuKey(sku));
   if (!part) return;
 
@@ -2637,6 +2775,11 @@ Rekord wróci do nowych operacji. Historia pozostanie bez zmian.`;
 };
 
 document.getElementById("addSupplierBtn")?.addEventListener("click", async () => {
+  if (!canCreateSuppliers()) {
+    toast("Brak dostępu", "Nie masz uprawnienia do dodawania dostawców.", "warning");
+    return;
+  }
+
   const btn = document.getElementById("addSupplierBtn");
   if (btn?.dataset.busy === "1") return;
 
@@ -2678,6 +2821,11 @@ document.getElementById("addSupplierBtn")?.addEventListener("click", async () =>
 });
 
 window.toggleSupplierArchive = async (name) => {
+  if (!canEditSuppliers()) {
+    toast("Brak dostępu", "Nie masz uprawnienia do edycji i archiwizacji dostawców.", "warning");
+    return;
+  }
+
   const supplier = state.suppliers.get(normalize(name));
   if (!supplier) return;
 
@@ -2816,6 +2964,11 @@ function closeMachineEditorModal() {
 }
 
 function startNewMachineFlow() {
+  if (!canCreateCatalogMachines()) {
+    toast("Brak dostępu", "Nie masz uprawnienia do dodawania maszyn.", "warning");
+    return;
+  }
+
   editingMachineIsNew = true;
   editingMachineOriginalCode = null;
   editingMachineSnapshot = null;
@@ -2851,6 +3004,11 @@ function startNewMachineFlow() {
 document.getElementById("openMachineModalBtn")?.addEventListener("click", startNewMachineFlow);
 
 window.toggleMachineArchive = async (code) => {
+  if (!canEditCatalogMachines()) {
+    toast("Brak dostępu", "Nie masz uprawnienia do edycji i archiwizacji maszyn.", "warning");
+    return;
+  }
+
   const machine = state.machineCatalog.find(m => m.code === code);
   const name = machine?.name || code;
   if (!machine) return;
@@ -2885,6 +3043,11 @@ Rekord wróci do nowych operacji. Historia pozostanie bez zmian.`;
 };
 
 window.openSupplierEditor = (name) => {
+  if (!canEditSuppliers()) {
+    toast("Brak dostępu", "Nie masz uprawnienia do edycji dostawców i cenników.", "warning");
+    return;
+  }
+
   editingSup = name;
   const originalSup = state.suppliers.get(name);
   editingSupSnapshot = originalSup ? {
@@ -2927,6 +3090,11 @@ function renderSupEditorTable() {
 }
 
 document.getElementById("supplierEditorSetPriceBtn")?.addEventListener("click", () => {
+  if (!canEditSuppliers()) {
+    toast("Brak dostępu", "Nie masz uprawnienia do edycji cenników dostawców.", "warning");
+    return;
+  }
+
   const sku = document.getElementById("supplierEditorPartSelect")?.value;
   const price = document.getElementById("supplierEditorPriceInput")?.value;
   if (!sku) {
@@ -2940,6 +3108,11 @@ document.getElementById("supplierEditorSetPriceBtn")?.addEventListener("click", 
 });
 
 document.getElementById("supplierEditorSaveBtn")?.addEventListener("click", async () => {
+  if (!canEditSuppliers()) {
+    toast("Brak dostępu", "Nie masz uprawnienia do edycji cenników dostawców.", "warning");
+    return;
+  }
+
   const btn = document.getElementById("supplierEditorSaveBtn");
   if (btn?.dataset.busy === "1") return;
   if (!editingSup) return;
@@ -2997,6 +3170,11 @@ document.getElementById("supplierEditorCancelBtn")?.addEventListener("click", ()
 });
 
 window.openMachineEditor = (code) => {
+  if (!canEditCatalogMachines()) {
+    toast("Brak dostępu", "Nie masz uprawnienia do edycji maszyn i BOM.", "warning");
+    return;
+  }
+
   editingMachineIsNew = false;
   const machine = state.machineCatalog.find(m => m.code === code);
   if (!machine) return;
@@ -3093,6 +3271,11 @@ document.getElementById("machineNameInput")?.addEventListener("input", (e) => {
 });
 
 document.getElementById("addBomItemBtn")?.addEventListener("click", () => {
+  if (!canEditCatalogMachines()) {
+    toast("Brak dostępu", "Nie masz uprawnienia do edycji BOM maszyn.", "warning");
+    return;
+  }
+
   const draft = ensureEditingMachineDraft();
   const { selectEl, part, sku } = getBomEditorSelection();
   const qtyInput = document.getElementById("bomQtyInput");
@@ -3140,6 +3323,11 @@ document.getElementById("addBomItemBtn")?.addEventListener("click", () => {
 });
 
 window.removeBomItem = (idx) => {
+  if (!canEditCatalogMachines()) {
+    toast("Brak dostępu", "Nie masz uprawnienia do edycji BOM maszyn.", "warning");
+    return;
+  }
+
   const draft = ensureEditingMachineDraft();
   if (idx < 0 || idx >= draft.bom.length) return;
   draft.bom.splice(idx, 1);
@@ -3148,6 +3336,13 @@ window.removeBomItem = (idx) => {
 };
 
 document.getElementById("machineEditorSaveBtn")?.addEventListener("click", async () => {
+  const isCreateFlow = !!editingMachineIsNew;
+  const hasPermission = isCreateFlow ? canCreateCatalogMachines() : canEditCatalogMachines();
+  if (!hasPermission) {
+    toast("Brak dostępu", isCreateFlow ? "Nie masz uprawnienia do dodawania maszyn." : "Nie masz uprawnienia do edycji maszyn i BOM.", "warning");
+    return;
+  }
+
   const btn = document.getElementById("machineEditorSaveBtn");
   if (btn?.dataset.busy === "1") return;
 
@@ -3388,6 +3583,11 @@ function bindTabs() {
 
 // === Edit Part Functions ===
 window.startEditPart = (sku) => {
+  if (!canEditCatalogParts()) {
+    toast("Brak dostępu", "Nie masz uprawnienia do edycji części.", "warning");
+    return;
+  }
+
   const k = skuKey(sku);
   const part = state.partsCatalog.get(k);
   if (!part) return;
@@ -3425,6 +3625,11 @@ window.startEditPart = (sku) => {
 };
 
 async function saveEditPart() {
+  if (!canEditCatalogParts()) {
+    toast("Brak dostępu", "Nie masz uprawnienia do edycji części.", "warning");
+    return;
+  }
+
   const btn = document.getElementById("saveEditPartBtn");
   if (btn?.dataset.busy === "1") return;
 

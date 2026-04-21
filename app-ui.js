@@ -460,6 +460,16 @@ function renderWarehouse() {
   const els = getEls();
   if (!els.summaryTable) return;
 
+  if (typeof enforceFeaturePermissionSafeStates === 'function') {
+    enforceFeaturePermissionSafeStates();
+  }
+
+  const canThresholdsManage = typeof canManageCompanyThresholds === 'function' ? canManageCompanyThresholds() : true;
+  const canStockAdjustmentsManage = typeof canManageStockAdjustments === 'function' ? canManageStockAdjustments() : true;
+  const thresholdsBtn = document.getElementById("toggleThresholdsBtn");
+  const thresholdsPanel = document.getElementById("thresholdsPanel");
+  const warnRange = document.getElementById("warnRange");
+  const dangerRange = document.getElementById("dangerRange");
   const searchInput = document.getElementById("searchParts");
   const q = normalize(searchInput?.value).toLowerCase();
   const stockEditToggleBtn = document.getElementById("stockEditToggleBtn");
@@ -474,6 +484,15 @@ function renderWarehouse() {
 
   if (showArchivedToggle) showArchivedToggle.checked = showArchived;
   if (showOnlyAlertsToggle) showOnlyAlertsToggle.checked = showOnlyAlerts;
+  if (thresholdsBtn) {
+    thresholdsBtn.disabled = !canThresholdsManage;
+    thresholdsBtn.setAttribute('aria-disabled', canThresholdsManage ? 'false' : 'true');
+  }
+  if (warnRange) warnRange.disabled = !canThresholdsManage;
+  if (dangerRange) dangerRange.disabled = !canThresholdsManage;
+  if (thresholdsPanel) {
+    thresholdsPanel.classList.toggle('permissions-readonly', !canThresholdsManage);
+  }
 
   const totalValueRows = computePartsSummary({ includeArchived: false });
   const summaryRows = computePartsSummary({ includeArchived: showArchived }).filter(item => {
@@ -501,8 +520,17 @@ function renderWarehouse() {
   if (els.sideWarehouseTotal) els.sideWarehouseTotal.textContent = totalFormatted;
   if (els.whTotal) els.whTotal.textContent = totalFormatted;
 
-  if (stockEditToggleBtn) stockEditToggleBtn.classList.toggle("hidden", isEditMode);
-  if (stockEditActions) stockEditActions.classList.toggle("hidden", !isEditMode);
+  if (stockEditToggleBtn) {
+    stockEditToggleBtn.classList.toggle("hidden", isEditMode);
+    stockEditToggleBtn.disabled = !canStockAdjustmentsManage;
+    stockEditToggleBtn.setAttribute('aria-disabled', canStockAdjustmentsManage ? 'false' : 'true');
+  }
+  if (stockEditActions) {
+    stockEditActions.classList.toggle("hidden", !isEditMode);
+    stockEditActions.querySelectorAll('button').forEach(btn => {
+      btn.disabled = !canStockAdjustmentsManage;
+    });
+  }
   if (stockEditBanner) {
     if (isEditMode) {
       stockEditBanner.classList.remove("hidden");
@@ -553,6 +581,7 @@ function renderWarehouse() {
               data-sku="${escapeHtml(item.sku)}"
               value="${escapeHtml(pending?.rawValue ?? String(item.qty))}"
               aria-label="Docelowy stan dla części ${escapeHtml(item.sku)}"
+              ${canStockAdjustmentsManage ? '' : 'disabled'}
             />
             <div class="stock-edit-meta">
               <span class="text-muted">Było: ${item.qty}</span>
@@ -1780,6 +1809,14 @@ function renderAllSuppliers() {
   const tbody = table?.querySelector("tbody");
   if (!tbody) return;
 
+  const canCreate = typeof canCreateSuppliers === 'function' ? canCreateSuppliers() : true;
+  const canEdit = typeof canEditSuppliers === 'function' ? canEditSuppliers() : true;
+  const supplierAddRow = document.querySelector('.supplier-add-row');
+  if (supplierAddRow) {
+    supplierAddRow.classList.toggle('hidden', !canCreate);
+    supplierAddRow.setAttribute('aria-hidden', canCreate ? 'false' : 'true');
+  }
+
   const q = normalizeCatalogSearchQuery(document.getElementById("searchCatalogSuppliers")?.value);
   
   tbody.innerHTML = Array.from(state.suppliers.keys())
@@ -1803,8 +1840,8 @@ function renderAllSuppliers() {
           <td class="text-right">
             <div class="catalog-actions">
               <button class="btn btn-secondary btn-sm" type="button" data-action="openSupplierCatalogDetails" data-supplier="${escapeHtml(name)}">Szczegóły</button>
-              <button class="btn btn-success btn-sm" onclick="openSupplierEditor('${escapeHtml(name)}')">Cennik</button>
-              <button class="btn btn-secondary btn-sm" onclick="toggleSupplierArchive('${escapeHtml(name)}')">${isArchived ? 'Przywróć' : 'Archiwizuj'}</button>
+              ${canEdit ? `<button class="btn btn-success btn-sm" onclick="openSupplierEditor('${escapeHtml(name)}')">Cennik</button>` : ``}
+              ${canEdit ? `<button class="btn btn-secondary btn-sm" onclick="toggleSupplierArchive('${escapeHtml(name)}')">${isArchived ? 'Przywróć' : 'Archiwizuj'}</button>` : ``}
             </div>
           </td>
         </tr>
@@ -1817,6 +1854,22 @@ function renderAllSuppliers() {
 function refreshCatalogsUI() {
   const els = getEls();
   if (!els.partsCatalog || !els.machinesCatalog) return;
+
+  const canPartsCreate = typeof canCreateCatalogParts === 'function' ? canCreateCatalogParts() : true;
+  const canPartsEdit = typeof canEditCatalogParts === 'function' ? canEditCatalogParts() : true;
+  const canMachinesCreate = typeof canCreateCatalogMachines === 'function' ? canCreateCatalogMachines() : true;
+  const canMachinesEdit = typeof canEditCatalogMachines === 'function' ? canEditCatalogMachines() : true;
+  const newPartBtn = document.getElementById('toggleNewPartBtn');
+  const newMachineBtn = document.getElementById('openMachineModalBtn');
+
+  if (newPartBtn) {
+    newPartBtn.classList.toggle('hidden', !canPartsCreate);
+    newPartBtn.setAttribute('aria-hidden', canPartsCreate ? 'false' : 'true');
+  }
+  if (newMachineBtn) {
+    newMachineBtn.classList.toggle('hidden', !canMachinesCreate);
+    newMachineBtn.setAttribute('aria-hidden', canMachinesCreate ? 'false' : 'true');
+  }
 
   const parts = Array.from(state.partsCatalog.values());
   const activeParts = getActivePartsCatalog();
@@ -1850,8 +1903,8 @@ function refreshCatalogsUI() {
         <td class="text-right">
           <div class="catalog-actions">
             <button class="btn btn-secondary btn-sm" type="button" data-action="openCatalogPartDetails" data-sku="${escapeHtml(p.sku)}">Szczegóły</button>
-            <button class="btn btn-success btn-sm" onclick="startEditPart('${escapeHtml(p.sku)}')">Edytuj</button>
-            <button class="btn btn-secondary btn-sm" onclick="togglePartArchive('${escapeHtml(p.sku)}')">${isArchived ? 'Przywróć' : 'Archiwizuj'}</button>
+            ${canPartsEdit ? `<button class="btn btn-success btn-sm" onclick="startEditPart('${escapeHtml(p.sku)}')">Edytuj</button>` : ``}
+            ${canPartsEdit ? `<button class="btn btn-secondary btn-sm" onclick="togglePartArchive('${escapeHtml(p.sku)}')">${isArchived ? 'Przywróć' : 'Archiwizuj'}</button>` : ``}
           </div>
         </td>
       </tr>`;
@@ -1880,8 +1933,8 @@ function refreshCatalogsUI() {
           <td class="text-right">
             <div class="catalog-actions">
               <button class="btn btn-secondary btn-sm" type="button" data-action="openMachineCatalogDetails" data-machine-code="${escapeHtml(m.code)}">Szczegóły</button>
-              <button class="btn btn-success btn-sm" onclick="openMachineEditor('${escapeHtml(m.code)}')">Edytuj BOM</button>
-              <button class="btn btn-secondary btn-sm" onclick="toggleMachineArchive('${escapeHtml(m.code)}')">${isArchived ? 'Przywróć' : 'Archiwizuj'}</button>
+              ${canMachinesEdit ? `<button class="btn btn-success btn-sm" onclick="openMachineEditor('${escapeHtml(m.code)}')">Edytuj BOM</button>` : ``}
+              ${canMachinesEdit ? `<button class="btn btn-secondary btn-sm" onclick="toggleMachineArchive('${escapeHtml(m.code)}')">${isArchived ? 'Przywróć' : 'Archiwizuj'}</button>` : ``}
             </div>
           </td>
         </tr>

@@ -3845,3 +3845,15 @@ body.account-settings-open {
     width: 100%;
   }
 }
+
+
+.permissions-readonly {
+  opacity: 0.9;
+}
+
+.permissions-readonly input,
+.permissions-readonly select,
+.permissions-readonly textarea,
+.permissions-readonly button {
+  cursor: not-allowed;
+}

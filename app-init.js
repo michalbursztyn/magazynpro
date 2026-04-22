@@ -705,6 +705,41 @@ function initNewPartToggle() {
   cancelBtn?.addEventListener("click", () => closeNewPartPanel({ clear: true }));
 }
 
+function applyTableSystemClasses() {
+  const mainTableSelectors = [
+    '#skuSummaryTable',
+    '#historyTable',
+    '#partsCatalogTable',
+    '#suppliersListTable',
+    '#machinesCatalogTable',
+    '#machinesStockTable',
+    '#companyUsersTable'
+  ];
+  const operationalTableSelectors = [
+    '#deliveryItemsTable',
+    '#buildItemsTable'
+  ];
+  const denseTableSelectors = [
+    '.history-modal-table',
+    '.batch-preview-table',
+    '.part-details-table'
+  ];
+
+  mainTableSelectors.forEach(selector => {
+    const table = document.querySelector(selector);
+    if (table) table.classList.add('table-main');
+  });
+
+  operationalTableSelectors.forEach(selector => {
+    const table = document.querySelector(selector);
+    if (table) table.classList.add('table-operational');
+  });
+
+  denseTableSelectors.forEach(selector => {
+    document.querySelectorAll(selector).forEach(table => table.classList.add('table-dense'));
+  });
+}
+
 // === MAIN INIT ===
 
 const APP_TABS = Object.freeze([
@@ -2428,6 +2463,7 @@ async function init() {
   const initPromise = (async () => {
   initThresholdsToggle();
   initNewPartToggle();
+  applyTableSystemClasses();
   initStockEditMode();
   initWarehouseArchiveToggles();
   

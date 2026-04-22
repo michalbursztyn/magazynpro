@@ -667,21 +667,42 @@ input[type="date"] {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface-1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.015);
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
   font-size: var(--text-sm);
+  --table-cell-y: 12px;
+  --table-cell-x: 16px;
+  --table-head-y: 12px;
+  --table-head-x: 16px;
+}
+
+table.table-operational {
+  --table-cell-y: 10px;
+  --table-cell-x: 14px;
+  --table-head-y: 10px;
+  --table-head-x: 14px;
+}
+
+table.table-dense {
+  --table-cell-y: 9px;
+  --table-cell-x: 12px;
+  --table-head-y: 9px;
+  --table-head-x: 12px;
 }
 
 th, td {
-  padding: var(--space-3) var(--space-4);
+  padding: var(--table-cell-y) var(--table-cell-x);
   text-align: left;
+  vertical-align: middle;
   border-bottom: 1px solid var(--border);
 }
 
 th {
+  padding: var(--table-head-y) var(--table-head-x);
   background: var(--thead-bg);
   font-weight: var(--font-semibold);
   font-size: var(--text-xs);
@@ -689,6 +710,11 @@ th {
   letter-spacing: 0.05em;
   color: var(--text-tertiary);
   white-space: nowrap;
+}
+
+table.table-dense th {
+  font-size: 0.625rem;
+  letter-spacing: 0.06em;
 }
 
 tr:last-child td {
@@ -709,6 +735,26 @@ tbody tr:nth-child(even) {
 
 tbody tr:nth-child(even):hover {
   background: var(--row-hover);
+}
+
+.table-maincell {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.table-cell-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.table-subcell {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
 }
 
 /* Sticky Header */
@@ -1378,8 +1424,8 @@ body.history-preview-open {
 
 .history-modal-table-dense td,
 .history-modal-table-dense th {
-  padding-top: 10px;
-  padding-bottom: 10px;
+  padding-top: 9px;
+  padding-bottom: 9px;
 }
 
 .history-table-maincell {
@@ -2326,7 +2372,8 @@ input[type="range"]::-moz-range-thumb {
 
 .table-row-actions,
 .catalog-actions,
-.user-row-actions-clean {
+.user-row-actions-clean,
+.table-actions {
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
@@ -2336,7 +2383,8 @@ input[type="range"]::-moz-range-thumb {
 
 .table-row-actions .btn,
 .catalog-actions .btn,
-.user-row-actions-clean .btn {
+.user-row-actions-clean .btn,
+.table-actions .btn {
   min-height: 32px;
   height: 32px;
   min-width: 88px;
@@ -2347,7 +2395,8 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .table-row-actions .btn,
-.catalog-actions .btn {
+.catalog-actions .btn,
+.table-actions .btn {
   background: var(--surface-2);
   color: var(--text);
   border-color: var(--border);
@@ -2355,21 +2404,34 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .table-row-actions .btn:hover:not(:disabled),
-.catalog-actions .btn:hover:not(:disabled) {
+.catalog-actions .btn:hover:not(:disabled),
+.table-actions .btn:hover:not(:disabled) {
   background: var(--surface-3);
   border-color: var(--border-strong);
   color: var(--text);
 }
 
 .table-row-actions .btn:active:not(:disabled),
-.catalog-actions .btn:active:not(:disabled) {
+.catalog-actions .btn:active:not(:disabled),
+.table-actions .btn:active:not(:disabled) {
   background: var(--surface-4);
 }
 
 .table-row-actions .btn:focus-visible,
 .catalog-actions .btn:focus-visible,
-.user-row-actions-clean .btn:focus-visible {
+.user-row-actions-clean .btn:focus-visible,
+.table-actions .btn:focus-visible {
   box-shadow: var(--focus-ring);
+}
+
+.table-actions-tight .btn {
+  min-width: 32px;
+}
+
+.table-actions-tight .btn.btn-icon {
+  width: 32px;
+  min-width: 32px;
+  padding-inline: 0;
 }
 
 .catalog-readonly-backdrop {

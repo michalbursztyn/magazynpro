@@ -391,7 +391,7 @@ function openBatchPreviewByPrice(sku, price) {
           <span class="text-secondary" style="font-size:var(--text-sm)">${supGroup.totalQty} szt. • ${fmtPLN.format(supGroup.totalValue)}</span>
         </div>
         <div class="table-container" style="margin:0">
-          <table class="batch-preview-table">
+          <table class="batch-preview-table table-dense">
             <thead>
               <tr><th>Partia</th><th>Data przyjęcia</th><th class="text-right">Ilość</th><th class="text-right">Wartość</th></tr>
             </thead>
@@ -711,18 +711,22 @@ function renderDelivery() {
     total += rowVal;
     return `<tr>
       <td>
-        <div style="display:flex;gap:var(--space-2);align-items:center">
+        <div class="table-maincell">
           <span class="badge">${escapeHtml(i.sku)}</span>
-          <span>${escapeHtml(i.name || "")}</span>
+          <div class="table-cell-stack">
+            <span>${escapeHtml(i.name || "")}</span>
+          </div>
         </div>
       </td>
       <td class="text-right">${i.qty}</td>
       <td class="text-right">${fmtPLN.format(i.price)}</td>
       <td class="text-right">${fmtPLN.format(rowVal)}</td>
       <td class="text-right">
-        <button class="btn btn-danger btn-sm btn-icon" onclick="removeDeliveryItem(${i.id})" aria-label="Usuń">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
+        <div class="table-actions table-actions-tight">
+          <button class="btn btn-danger btn-sm btn-icon" onclick="removeDeliveryItem(${i.id})" aria-label="Usuń">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
       </td>
     </tr>`;
   }).join("");
@@ -750,16 +754,20 @@ function renderBuild() {
     const machineName = getBuildItemMachineName(i);
     return `<tr>
       <td>
-        <div style="display:flex;gap:var(--space-2);align-items:center">
+        <div class="table-maincell">
           <span class="badge">${escapeHtml(i.machineCode)}</span>
-          <span>${escapeHtml(machineName || "???")}</span>
+          <div class="table-cell-stack">
+            <span>${escapeHtml(machineName || "???")}</span>
+          </div>
         </div>
       </td>
       <td class="text-right">${i.qty}</td>
       <td class="text-right">
-        <button class="btn btn-danger btn-sm btn-icon" onclick="removeBuildItem(${i.id})" aria-label="Usuń">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
+        <div class="table-actions table-actions-tight">
+          <button class="btn btn-danger btn-sm btn-icon" onclick="removeBuildItem(${i.id})" aria-label="Usuń">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
       </td>
     </tr>`;
   }).join("");
@@ -1349,7 +1357,7 @@ function buildHistoryDetails(ev) {
           </div>
         </div>
         <div class="table-container history-modal-table-wrap">
-          <table class="history-modal-table">
+          <table class="history-modal-table table-dense">
             <thead>
               <tr>
                 <th>Nazwa (ID)</th>
@@ -1426,7 +1434,7 @@ function buildHistoryDetails(ev) {
       </div>
     ` : `
       <div class="table-container history-modal-table-wrap">
-        <table class="history-modal-table history-modal-table-dense">
+        <table class="history-modal-table history-modal-table-dense table-dense">
           <thead>
             <tr>
               <th>Nazwa (ID)</th>

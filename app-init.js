@@ -711,13 +711,16 @@ function initNewPartToggle() {
 }
 
 function applyTableSystemClasses() {
-  const mainTableSelectors = [
+  const paginatedTableSelectors = [
     '#skuSummaryTable',
     '#historyTable',
     '#partsCatalogTable',
     '#suppliersListTable',
     '#machinesCatalogTable',
-    '#machinesStockTable',
+    '#machinesStockTable'
+  ];
+  const mainTableSelectors = [
+    ...paginatedTableSelectors,
     '#companyUsersTable'
   ];
   const operationalTableSelectors = [
@@ -735,6 +738,11 @@ function applyTableSystemClasses() {
     if (table) table.classList.add('table-main', 'table-sticky');
   });
 
+  paginatedTableSelectors.forEach(selector => {
+    const table = document.querySelector(selector);
+    if (table) table.classList.add('table-paginated');
+  });
+
   operationalTableSelectors.forEach(selector => {
     const table = document.querySelector(selector);
     if (table) table.classList.add('table-operational');
@@ -746,13 +754,16 @@ function applyTableSystemClasses() {
 }
 
 function ensureMainTableScrollContainers() {
-  const mainTableSelectors = [
+  const paginatedTableSelectors = new Set([
     '#skuSummaryTable',
     '#historyTable',
     '#partsCatalogTable',
     '#suppliersListTable',
     '#machinesCatalogTable',
-    '#machinesStockTable',
+    '#machinesStockTable'
+  ]);
+  const mainTableSelectors = [
+    ...Array.from(paginatedTableSelectors),
     '#companyUsersTable'
   ];
 
@@ -764,12 +775,18 @@ function ensureMainTableScrollContainers() {
     if (existingContainer) {
       existingContainer.classList.add('table-scroll-main');
       existingContainer.setAttribute('data-table-scroll', 'main');
+      if (paginatedTableSelectors.has(selector)) {
+        existingContainer.classList.add('table-scroll-paginated');
+      }
       return;
     }
 
     const wrapper = document.createElement('div');
     wrapper.className = 'table-container table-scroll-main';
     wrapper.setAttribute('data-table-scroll', 'main');
+    if (paginatedTableSelectors.has(selector)) {
+      wrapper.classList.add('table-scroll-paginated');
+    }
 
     const parent = table.parentNode;
     if (!parent) return;

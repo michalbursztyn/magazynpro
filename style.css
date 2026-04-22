@@ -767,6 +767,10 @@ tbody tr:nth-child(even):hover {
   scrollbar-gutter: stable both-edges;
 }
 
+.table-scroll-main.table-scroll-paginated {
+  height: min(68vh, 720px);
+}
+
 .table-scroll-main table {
   min-width: 100%;
 }
@@ -787,16 +791,21 @@ tbody tr:nth-child(even):hover {
   .table-scroll-main {
     max-height: min(62vh, 640px);
   }
+
+  .table-scroll-main.table-scroll-paginated {
+    height: min(62vh, 640px);
+  }
 }
 
 .table-pagination {
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
   margin-top: var(--space-3);
+  min-height: 48px;
 }
 
 .table-pagination.hidden {
-  display: none !important;
+  display: flex !important;
 }
 
 .table-pagination-inner {

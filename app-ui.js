@@ -84,19 +84,10 @@ window.resetTablePage = resetTablePage;
 
 function paginateTableRows(tableKey, rows) {
   const list = Array.isArray(rows) ? rows : [];
-  if (list.length <= TABLE_PAGE_SIZE) {
-    resetTablePage(tableKey);
-    return {
-      rows: list,
-      page: 1,
-      totalPages: 1,
-      totalRows: list.length,
-      isEnabled: false
-    };
-  }
-
   const totalPages = Math.max(1, Math.ceil(list.length / TABLE_PAGE_SIZE));
-  const page = clampTablePage(tableKey, totalPages);
+  const page = list.length <= TABLE_PAGE_SIZE
+    ? resetTablePage(tableKey)
+    : clampTablePage(tableKey, totalPages);
   const start = (page - 1) * TABLE_PAGE_SIZE;
 
   return {
@@ -104,7 +95,7 @@ function paginateTableRows(tableKey, rows) {
     page,
     totalPages,
     totalRows: list.length,
-    isEnabled: true
+    isEnabled: totalPages > 1
   };
 }
 
@@ -135,20 +126,12 @@ function renderTablePagination(tableSelector, tableKey, meta) {
   const mount = getTablePaginationMount(tableElement);
   if (!mount) return;
 
-  const totalRows = Number(meta?.totalRows) || 0;
   const totalPages = Math.max(1, Number(meta?.totalPages) || 1);
   const page = Math.min(Math.max(Number(meta?.page) || 1, 1), totalPages);
-  const isEnabled = totalRows > TABLE_PAGE_SIZE && totalPages > 1;
-
-  if (!isEnabled) {
-    mount.innerHTML = '';
-    mount.classList.add('hidden');
-    return;
-  }
 
   mount.classList.remove('hidden');
   mount.innerHTML = `
-    <div class="table-pagination-inner">
+    <div class="table-pagination-inner" aria-label="Paginacja tabeli">
       <button type="button" class="table-pagination-btn" aria-label="Poprzednia strona" ${page <= 1 ? 'disabled' : ''} onclick="changeTablePage('${escapeHtml(tableKey)}', -1)">&lt;</button>
       <span class="table-pagination-label">Strona ${page} z ${totalPages}</span>
       <button type="button" class="table-pagination-btn" aria-label="Następna strona" ${page >= totalPages ? 'disabled' : ''} onclick="changeTablePage('${escapeHtml(tableKey)}', 1)">&gt;</button>

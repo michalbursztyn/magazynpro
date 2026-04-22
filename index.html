@@ -88,72 +88,76 @@
         </div>
       </section>
 
-      <section class="tabPanel hidden" data-tab-panel="delivery">
-        <div class="card">
-          <div class="cardHeader"><div><h2>Przyjęcie Dostawy</h2><p class="text-secondary">Wybierz dostawcę i dodaj towary</p></div></div>
-          <div class="grid-2">
-            <div>
-              <div class="form-row">
-                <label>Dostawca<select id="supplierSelect"></select></label>
-                <label>Data przyjęcia<input type="date" id="deliveryDate" required /></label>
-              </div>
-              <div class="form-row">
-                <label>Numer faktury<input type="text" id="deliveryInvoiceNumber" placeholder="np. FV/04/2026/001" autocomplete="off" required /></label>
-              </div>
-              <div class="form-row"><label>Wybierz część<select id="supplierPartsSelect"></select></label></div>
-              <div class="form-row form-row-3">
-                <label>Ilość<input type="number" id="deliveryQty" min="1" step="1" value="1" /></label>
-                <label>Cena jedn.<input type="number" id="deliveryPrice" min="0" step="0.01" value="0" /></label>
-                <div style="display:flex;align-items:flex-end"><button type="button" class="btn btn-secondary" id="addDeliveryItemBtn">Dodaj</button></div>
-              </div>
-            </div>
-            <div>
-              <div class="table-container" style="margin-bottom:var(--space-4)">
-                <table id="deliveryItemsTable">
-                  <thead><tr><th>Nazwa (ID)</th><th class="text-right">Ilość</th><th class="text-right">Cena</th><th class="text-right">Razem</th><th></th></tr></thead>
-                  <tbody></tbody>
-                </table>
-              </div>
-              <div class="delivery-actions">
-                <div class="delivery-summary">
-                  <div><span class="text-secondary">Pozycji:</span><strong id="itemsCount">0</strong></div>
-                  <div><span class="text-secondary">Do zapłaty:</span><strong id="itemsTotal">0,00 zł</strong></div>
+      <section class="tabPanel hidden operation-tab operation-tab-delivery" data-tab-panel="delivery">
+        <div class="card operation-card">
+          <div class="cardHeader operation-card-header"><div><h2>Przyjęcie Dostawy</h2><p class="text-secondary">Wybierz dostawcę i dodaj towary</p></div></div>
+          <div class="operation-shell">
+            <div class="operation-grid">
+              <div class="operation-main">
+                <div class="form-row operation-form-row operation-form-row-top">
+                  <label>Dostawca<select id="supplierSelect"></select></label>
+                  <label>Data przyjęcia<input type="date" id="deliveryDate" required /></label>
                 </div>
-                <button type="button" class="btn btn-primary" id="finalizeDeliveryBtn" disabled>Zatwierdź</button>
+                <div class="form-row operation-form-row">
+                  <label>Numer faktury<input type="text" id="deliveryInvoiceNumber" placeholder="np. FV/04/2026/001" autocomplete="off" required /></label>
+                </div>
+                <div class="form-row operation-form-row"><label>Wybierz część<select id="supplierPartsSelect"></select></label></div>
+                <div class="form-row form-row-3 operation-form-row operation-inline-actions">
+                  <label>Ilość<input type="number" id="deliveryQty" min="1" step="1" value="1" /></label>
+                  <label>Cena jedn.<input type="number" id="deliveryPrice" min="0" step="0.01" value="0" /></label>
+                  <div class="operation-action-slot"><button type="button" class="btn btn-secondary operation-add-btn" id="addDeliveryItemBtn">Dodaj</button></div>
+                </div>
+              </div>
+              <div class="operation-side">
+                <div class="table-container operation-table-wrap">
+                  <table id="deliveryItemsTable">
+                    <thead><tr><th>Nazwa (ID)</th><th class="text-right">Ilość</th><th class="text-right">Cena</th><th class="text-right">Razem</th><th></th></tr></thead>
+                    <tbody></tbody>
+                  </table>
+                </div>
+                <div class="delivery-actions operation-summary-panel">
+                  <div class="delivery-summary operation-summary-grid">
+                    <div><span class="text-secondary">Pozycji:</span><strong id="itemsCount">0</strong></div>
+                    <div><span class="text-secondary">Do zapłaty:</span><strong id="itemsTotal">0,00 zł</strong></div>
+                  </div>
+                  <button type="button" class="btn btn-primary operation-cta" id="finalizeDeliveryBtn" disabled>Zatwierdź</button>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      <section class="tabPanel hidden" data-tab-panel="build">
-        <div class="card">
-          <div class="cardHeader"><div><h2>Zlecenie Produkcyjne</h2><p class="text-secondary">Zaplanuj produkcję (FIFO)</p></div></div>
-          <div class="grid-2">
-            <div>
-              <div class="form-row"><label>Wybierz maszynę<select id="machineSelect"></select></label></div>
-              <div class="form-row form-row-3">
-                <label>Ilość sztuk<input type="number" id="buildQty" min="1" step="1" value="1" /></label>
-                <label>Data<input type="date" id="buildDate" /></label>
-                <div style="display:flex;align-items:flex-end"><button type="button" class="btn btn-secondary" id="addBuildItemBtn">Dodaj</button></div>
+      <section class="tabPanel hidden operation-tab operation-tab-build" data-tab-panel="build">
+        <div class="card operation-card">
+          <div class="cardHeader operation-card-header"><div><h2>Zlecenie Produkcyjne</h2><p class="text-secondary">Zaplanuj produkcję (FIFO)</p></div></div>
+          <div class="operation-shell">
+            <div class="operation-grid operation-grid-build">
+              <div class="operation-main">
+                <div class="form-row operation-form-row"><label>Wybierz maszynę<select id="machineSelect"></select></label></div>
+                <div class="form-row form-row-3 operation-form-row operation-inline-actions">
+                  <label>Ilość sztuk<input type="number" id="buildQty" min="1" step="1" value="1" /></label>
+                  <label>Data<input type="date" id="buildDate" /></label>
+                  <div class="operation-action-slot"><button type="button" class="btn btn-secondary operation-add-btn" id="addBuildItemBtn">Dodaj</button></div>
+                </div>
+                <hr class="operation-divider" />
+                <div class="form-row operation-form-row"><label>Tryb<select id="consumeMode"><option value="fifo" selected>Automatyczny (FIFO)</option><option value="manual">Ręczny wybór partii</option></select></label></div>
+                <div class="alert alert-danger hidden operation-alert" id="missingBox">
+                  <div><strong>Braki magazynowe!</strong><p style="margin-top:var(--space-2);margin-bottom:0">Brakuje części:</p><ul id="missingList" style="margin-top:var(--space-2);margin-bottom:0;padding-left:var(--space-5)"></ul></div>
+                </div>
               </div>
-              <hr style="border:0;height:1px;background:var(--border);margin:var(--space-4) 0" />
-              <div class="form-row"><label>Tryb<select id="consumeMode"><option value="fifo" selected>Automatyczny (FIFO)</option><option value="manual">Ręczny wybór partii</option></select></label></div>
-              <div class="alert alert-danger hidden" id="missingBox">
-                <div><strong>Braki magazynowe!</strong><p style="margin-top:var(--space-2);margin-bottom:0">Brakuje części:</p><ul id="missingList" style="margin-top:var(--space-2);margin-bottom:0;padding-left:var(--space-5)"></ul></div>
-              </div>
-            </div>
-            <div>
-              <div class="table-container" style="margin-bottom:var(--space-4)">
-                <table id="buildItemsTable"><thead><tr><th>Maszyna</th><th class="text-right">Ilość</th><th></th></tr></thead><tbody></tbody></table>
-              </div>
-              <div class="editor-panel hidden" id="manualConsumeBox">
-                <div class="editor-header" style="margin-bottom:var(--space-3);padding-bottom:var(--space-2)"><h4 style="margin:0;font-size:var(--text-base)">Wybór partii (Manual)</h4></div>
-                <div class="consume-grid" id="manualConsumeUI"></div>
-              </div>
-              <div class="delivery-actions">
-                <div class="delivery-summary"><span class="text-secondary">Maszyn:</span><strong id="buildItemsCount">0</strong></div>
-                <button type="button" class="btn btn-primary" id="finalizeBuildBtn" disabled>Finalizuj</button>
+              <div class="operation-side">
+                <div class="table-container operation-table-wrap">
+                  <table id="buildItemsTable"><thead><tr><th>Maszyna</th><th class="text-right">Ilość</th><th></th></tr></thead><tbody></tbody></table>
+                </div>
+                <div class="editor-panel hidden operation-manual-box" id="manualConsumeBox">
+                  <div class="editor-header operation-manual-header" style="margin-bottom:var(--space-3);padding-bottom:var(--space-2)"><h4 style="margin:0;font-size:var(--text-base)">Wybór partii (Manual)</h4></div>
+                  <div class="consume-grid" id="manualConsumeUI"></div>
+                </div>
+                <div class="delivery-actions operation-summary-panel">
+                  <div class="delivery-summary operation-summary-grid"><span class="text-secondary">Maszyn:</span><strong id="buildItemsCount">0</strong></div>
+                  <button type="button" class="btn btn-primary operation-cta" id="finalizeBuildBtn" disabled>Finalizuj</button>
+                </div>
               </div>
             </div>
           </div>

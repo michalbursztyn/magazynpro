@@ -2623,6 +2623,149 @@ body.part-details-open {
   border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
 }
 
+/* ---------- 28a) Operational Tabs ---------- */
+.operation-tab {
+  --operation-max-width: 1220px;
+}
+
+.operation-card {
+  width: min(100%, var(--operation-max-width));
+  margin-inline: auto;
+}
+
+.operation-card-header {
+  margin-bottom: var(--space-5);
+}
+
+.operation-shell {
+  width: 100%;
+}
+
+.operation-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(320px, 0.92fr);
+  gap: clamp(20px, 2vw, 32px);
+  align-items: start;
+}
+
+.operation-grid-build {
+  grid-template-columns: minmax(0, 1.02fr) minmax(340px, 0.98fr);
+}
+
+.operation-main,
+.operation-side {
+  min-width: 0;
+}
+
+.operation-main {
+  max-width: 720px;
+}
+
+.operation-side {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.operation-form-row {
+  margin-bottom: var(--space-4);
+}
+
+.operation-form-row-top {
+  grid-template-columns: minmax(0, 1.1fr) minmax(220px, 0.9fr);
+}
+
+.operation-inline-actions {
+  align-items: end;
+}
+
+.operation-action-slot {
+  display: flex;
+  align-items: flex-end;
+}
+
+.operation-add-btn {
+  min-width: 120px;
+}
+
+.operation-table-wrap {
+  margin-bottom: 0;
+}
+
+.operation-summary-panel {
+  margin-top: 0;
+  padding: var(--space-4);
+  background: linear-gradient(180deg, var(--surface-2), rgba(255, 255, 255, 0.02));
+}
+
+.operation-summary-grid {
+  gap: var(--space-3);
+}
+
+.operation-summary-grid > div {
+  min-width: 0;
+}
+
+.operation-cta {
+  align-self: flex-start;
+  width: auto;
+  min-width: clamp(170px, 34%, 230px);
+  padding-inline: clamp(20px, 2vw, 28px);
+}
+
+.operation-divider {
+  border: 0;
+  height: 1px;
+  background: var(--border);
+  margin: var(--space-4) 0;
+}
+
+.operation-alert {
+  margin-top: var(--space-2);
+}
+
+.operation-manual-box {
+  margin-bottom: 0;
+}
+
+.operation-manual-header {
+  margin-bottom: var(--space-3);
+}
+
+@media (max-width: 1100px) {
+  .operation-card {
+    width: 100%;
+  }
+
+  .operation-grid,
+  .operation-grid-build {
+    grid-template-columns: 1fr;
+  }
+
+  .operation-main {
+    max-width: none;
+  }
+
+  .operation-cta {
+    min-width: 200px;
+  }
+}
+
+@media (max-width: 760px) {
+  .operation-form-row-top {
+    grid-template-columns: 1fr;
+  }
+
+  .operation-action-slot,
+  .operation-add-btn,
+  .operation-cta {
+    width: 100%;
+  }
+
+  .operation-cta {
+    min-width: 0;
+  }
+}
+
 /* ---------- 29) Delivery Actions ---------- */
 .delivery-actions {
   display: flex;
@@ -2639,12 +2782,21 @@ body.part-details-open {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
   font-size: var(--text-sm);
 }
 
 .delivery-summary strong {
   font-size: var(--text-lg);
   color: var(--text);
+}
+
+@media (max-width: 640px) {
+  .delivery-summary {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 
 /* ---------- 30) Manual Consume ---------- */

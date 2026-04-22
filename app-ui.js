@@ -99,21 +99,6 @@ function paginateTableRows(tableKey, rows) {
   };
 }
 
-function removeHistoryLegacyTip(mount) {
-  if (!mount || mount.getAttribute('data-pagination-for') !== 'historyTable') return;
-
-  const shell = mount.parentElement;
-  if (!shell) return;
-
-  const legacyTipText = 'Tip: Kliknij "Podgląd" dla szczegółów.';
-  const candidateNodes = shell.querySelectorAll('p, div, span, small');
-
-  candidateNodes.forEach(node => {
-    if (node === mount || mount.contains(node)) return;
-    if ((node.textContent || '').trim() !== legacyTipText) return;
-    node.remove();
-  });
-}
 
 function getTablePaginationMount(tableElement) {
   if (!tableElement) return null;
@@ -146,7 +131,6 @@ function getTablePaginationMount(tableElement) {
 
   mount.classList.add('table-pagination-stable');
   mount.setAttribute('data-pagination-for', tableId);
-  removeHistoryLegacyTip(mount);
   return mount;
 }
 

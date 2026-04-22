@@ -798,15 +798,15 @@ function ensureMainTableScrollContainers() {
 // === MAIN INIT ===
 
 const APP_TABS = Object.freeze([
-  { id: "parts", label: "Magazyn Części", description: "Podgląd stanu, wartości i korekt części." },
-  { id: "delivery", label: "Dostawa", description: "Przyjęcie dostaw i dodawanie pozycji na magazyn." },
-  { id: "build", label: "Produkcja", description: "Tworzenie zleceń i zużycie części do budowy." },
-  { id: "machines", label: "Magazyn Maszyn", description: "Stan wyrobów gotowych i dostępność maszyn." },
-  { id: "catalog_parts", label: "Baza Części", description: "Katalog części, dostawców i statusów katalogowych." },
-  { id: "catalog_suppliers", label: "Dostawcy", description: "Baza dostawców i zarządzanie cennikami." },
-  { id: "catalog_machines", label: "Baza Maszyn", description: "Definicje maszyn i konfiguracja BOM." },
-  { id: "history", label: "Ostatnie akcje", description: "Historia dostaw, produkcji i korekt magazynowych." },
-  { id: "users", label: "Użytkownicy", description: "Użytkownicy firmy i konfiguracja ról." }
+  { id: "parts", label: "Magazyn Części", description: "" },
+  { id: "delivery", label: "Dostawa", description: "" },
+  { id: "build", label: "Produkcja", description: "" },
+  { id: "machines", label: "Magazyn Maszyn", description: "" },
+  { id: "catalog_parts", label: "Baza Części", description: "" },
+  { id: "catalog_suppliers", label: "Dostawcy", description: "" },
+  { id: "catalog_machines", label: "Baza Maszyn", description: "" },
+  { id: "history", label: "Ostatnie akcje", description: "" },
+  { id: "users", label: "Użytkownicy", description: "" }
 ]);
 
 const APP_TAB_ACCESS_FALLBACK = {
@@ -1486,7 +1486,7 @@ function renderRolePermissionsPanel() {
             <div class="role-permission-tile-head role-permission-tile-static">
               <div class="role-permission-tile-title">
                 <strong>${escapeHtml(tab.label)}</strong>
-                <span>${escapeHtml(tab.description)}</span>
+                ${tab.description ? `<span>${escapeHtml(tab.description)}</span>` : ""}
               </div>
               <span class="status-pill status-pill-${enabled ? 'success' : 'warning'}">${enabled ? 'Aktywna' : 'Wyłączona'}</span>
             </div>

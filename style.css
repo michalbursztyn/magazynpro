@@ -291,11 +291,6 @@ p {
   margin: 0;
 }
 
-.cardHeader p {
-  margin-top: var(--space-1);
-  font-size: var(--text-sm);
-}
-
 
 .warehouse-filter-toggle {
   position: relative;
@@ -2986,16 +2981,6 @@ body.part-details-open {
     opacity: 1;
     transform: translateY(0);
   }
-}
-
-/* ---------- 27) Footer ---------- */
-.app-footer {
-  text-align: center;
-  padding: var(--space-6) 0;
-  margin-top: var(--space-6);
-  border-top: 1px solid var(--border);
-  color: var(--text-muted);
-  font-size: var(--text-sm);
 }
 
 /* ---------- 28) Stock Status ---------- */

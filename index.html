@@ -33,10 +33,6 @@
       <header class="app-header">
         <div class="app-header-main">
           <h1>Magazyn <span class="logo-accent">PRO</span></h1>
-          <p class="text-secondary">
-            <strong>Nazwa (ID)</strong> to unikalny identyfikator. <strong>Typ</strong> to opis/kategoria.
-            Zużycie: <strong>FIFO</strong>.
-          </p>
         </div>
       </header>
 
@@ -100,7 +96,7 @@
 
       <section class="tabPanel hidden operation-tab operation-tab-delivery" data-tab-panel="delivery">
         <div class="card operation-card">
-          <div class="cardHeader operation-card-header"><div><h2>Przyjęcie Dostawy</h2><p class="text-secondary">Wybierz dostawcę i dodaj towary</p></div></div>
+          <div class="cardHeader operation-card-header"><div><h2>Przyjęcie Dostawy</h2></div></div>
           <div class="operation-shell">
             <div class="operation-grid">
               <div class="operation-main">
@@ -140,7 +136,7 @@
 
       <section class="tabPanel hidden operation-tab operation-tab-build" data-tab-panel="build">
         <div class="card operation-card">
-          <div class="cardHeader operation-card-header"><div><h2>Zlecenie Produkcyjne</h2><p class="text-secondary">Zaplanuj produkcję (FIFO)</p></div></div>
+          <div class="cardHeader operation-card-header"><div><h2>Zlecenie Produkcyjne</h2></div></div>
           <div class="operation-shell">
             <div class="operation-grid operation-grid-build">
               <div class="operation-main">
@@ -176,7 +172,7 @@
 
       <section class="tabPanel hidden" data-tab-panel="machines">
         <div class="card">
-          <div class="cardHeader"><div><h2>Magazyn Wyrobów Gotowych</h2><p class="text-secondary">Stan magazynowy maszyn</p></div><button type="button" class="btn btn-secondary btn-sm warehouse-filter-toggle" id="showArchivedMachinesToggle" aria-pressed="true">Pokaż zarchiwizowane</button></div>
+          <div class="cardHeader"><div><h2>Magazyn Wyrobów Gotowych</h2></div><button type="button" class="btn btn-secondary btn-sm warehouse-filter-toggle" id="showArchivedMachinesToggle" aria-pressed="true">Pokaż zarchiwizowane</button></div>
           <div class="toolbar"><input type="text" id="searchMachines" placeholder="Szukaj..." autocomplete="off" /></div>
           <div class="table-container">
             <table id="machinesStockTable"><thead><tr><th>Nazwa Maszyny (ID)</th><th>Typ</th><th class="text-right">Stan</th><th>Status</th></tr></thead><tbody></tbody></table>
@@ -186,7 +182,7 @@
 
       <section class="tabPanel hidden" data-tab-panel="catalog_parts">
         <div class="card">
-          <div class="cardHeader"><div><h2>Baza Części</h2><p class="text-secondary">Zarządzaj katalogiem części</p></div><button type="button" class="btn btn-primary btn-sm" id="toggleNewPartBtn">Nowa</button></div>
+          <div class="cardHeader"><div><h2>Baza Części</h2></div><button type="button" class="btn btn-primary btn-sm" id="toggleNewPartBtn">Nowa</button></div>
           <div class="toolbar"><input type="text" id="searchCatalogParts" placeholder="Szukaj po Nazwie/Typie..." autocomplete="off" /></div>
           <div class="table-container">
             <table id="partsCatalogTable"><thead><tr><th>Nazwa (ID)</th><th>Typ</th><th>Dostawcy</th><th>Status</th><th class="text-right">Akcje</th></tr></thead><tbody></tbody></table>
@@ -199,7 +195,6 @@
           <div class="cardHeader supplier-catalog-header">
             <div>
               <h2>Dostawcy i Cenniki</h2>
-              <p class="text-secondary">Zarządzaj dostawcami</p>
             </div>
             <div class="supplier-add-row">
               <input type="text" id="supplierNameInput" class="supplier-add-input" placeholder="np. Hurtownia X" autocomplete="off" />
@@ -217,7 +212,7 @@
 
       <section class="tabPanel hidden" data-tab-panel="catalog_machines">
         <div class="card">
-          <div class="cardHeader"><div><h2>Baza Maszyn (BOM)</h2><p class="text-secondary">Bill of Materials</p></div><button type="button" class="btn btn-primary btn-sm" id="openMachineModalBtn">Nowa</button></div>
+          <div class="cardHeader"><div><h2>Baza Maszyn (BOM)</h2></div><button type="button" class="btn btn-primary btn-sm" id="openMachineModalBtn">Nowa</button></div>
           <div class="toolbar"><input type="text" id="searchCatalogMachines" placeholder="Szukaj po Nazwie/Typie..." autocomplete="off" /></div>
           <div class="table-container">
             <table id="machinesCatalogTable"><thead><tr><th>Nazwa (ID)</th><th>Typ</th><th class="text-right">Części</th><th>Status</th><th class="text-right">Akcje</th></tr></thead><tbody id="machinesCatalogBody"></tbody></table>
@@ -231,7 +226,6 @@
           <div class="cardHeader users-admin-card-header">
             <div>
               <h2>Użytkownicy firmy</h2>
-              <p class="text-secondary">Tabela użytkowników i konfiguracja dostępu do zakładek per rola w obrębie bieżącej firmy.</p>
             </div>
             <div class="users-admin-header-actions">
               <button type="button" class="btn btn-primary btn-sm" id="openCreateUserModalBtn">Dodaj użytkownika</button>
@@ -372,7 +366,6 @@
           <div class="cardHeader history-card-header">
             <div>
               <h2>Ostatnie akcje</h2>
-              <p class="text-secondary">Historia operacji</p>
             </div>
             <div class="segmented history-view-switch" role="tablist" aria-label="Widok historii">
               <button type="button" id="historyViewAllBtn" role="tab" aria-selected="false">Wszystkie</button>
@@ -391,11 +384,9 @@
           <div class="table-container">
             <table class="table-sticky" id="historyTable"><thead><tr><th>Data</th><th>Autor</th><th>Szczegóły</th><th class="text-right">Podgląd</th></tr></thead><tbody></tbody></table>
           </div>
-          <p class="text-muted" style="margin-top:var(--space-3);font-size:var(--text-sm)">Tip: Kliknij "Podgląd" dla szczegółów.</p>
         </div>
       </section>
 
-      <footer class="app-footer" id="appFooter">Magazyn PRO v3.0 • Katalogi: Supabase • Operacje magazynowe: Supabase • Drafty: lokalnie</footer>
     </div>
 
     <aside class="globalSide" aria-label="Panel boczny">

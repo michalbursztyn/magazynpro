@@ -99,14 +99,20 @@ function paginateTableRows(tableKey, rows) {
   };
 }
 
-function cleanupHistorySectionTrailingTip(mount) {
+function removeHistoryLegacyTip(mount) {
   if (!mount || mount.getAttribute('data-pagination-for') !== 'historyTable') return;
-  let node = mount.nextElementSibling;
-  while (node) {
-    const next = node.nextElementSibling;
+
+  const shell = mount.parentElement;
+  if (!shell) return;
+
+  const legacyTipText = 'Tip: Kliknij "Podgląd" dla szczegółów.';
+  const candidateNodes = shell.querySelectorAll('p, div, span, small');
+
+  candidateNodes.forEach(node => {
+    if (node === mount || mount.contains(node)) return;
+    if ((node.textContent || '').trim() !== legacyTipText) return;
     node.remove();
-    node = next;
-  }
+  });
 }
 
 function getTablePaginationMount(tableElement) {
@@ -140,7 +146,7 @@ function getTablePaginationMount(tableElement) {
 
   mount.classList.add('table-pagination-stable');
   mount.setAttribute('data-pagination-for', tableId);
-  cleanupHistorySectionTrailingTip(mount);
+  removeHistoryLegacyTip(mount);
   return mount;
 }
 

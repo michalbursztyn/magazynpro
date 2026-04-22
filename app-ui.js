@@ -335,6 +335,12 @@ function closePartDetailsModal() {
 
 // === NEW: Batch Preview by Price (with supplier breakdown) ===
 
+function syncWarehouseToggleButtonState(button, isActive) {
+  if (!button) return;
+  button.classList.toggle("is-active", !!isActive);
+  button.setAttribute("aria-pressed", isActive ? "true" : "false");
+}
+
 function openBatchPreviewByPrice(sku, price) {
   const skuKeyVal = skuKey(sku);
   const part = state.partsCatalog.get(skuKeyVal);
@@ -482,8 +488,8 @@ function renderWarehouse() {
   const showArchived = shouldShowArchivedPartsInWarehouse();
   const showOnlyAlerts = shouldShowOnlyAlertsPartsInWarehouse();
 
-  if (showArchivedToggle) showArchivedToggle.checked = showArchived;
-  if (showOnlyAlertsToggle) showOnlyAlertsToggle.checked = showOnlyAlerts;
+  syncWarehouseToggleButtonState(showArchivedToggle, showArchived);
+  syncWarehouseToggleButtonState(showOnlyAlertsToggle, showOnlyAlerts);
   if (thresholdsBtn) {
     thresholdsBtn.classList.toggle("hidden", !canThresholdsManage);
     thresholdsBtn.setAttribute('aria-hidden', canThresholdsManage ? 'false' : 'true');
@@ -784,7 +790,7 @@ function renderMachinesStock() {
   const showArchivedToggle = document.getElementById("showArchivedMachinesToggle");
   const showArchived = shouldShowArchivedMachinesInStock();
 
-  if (showArchivedToggle) showArchivedToggle.checked = showArchived;
+  syncWarehouseToggleButtonState(showArchivedToggle, showArchived);
 
   const tbody = document.querySelector("#machinesStockTable tbody");
   if (!tbody) return;

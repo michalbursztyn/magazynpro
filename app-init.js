@@ -338,25 +338,31 @@ function initWarehouseArchiveToggles() {
   const machinesToggle = document.getElementById("showArchivedMachinesToggle");
 
   if (partsToggle) {
-    partsToggle.checked = shouldShowArchivedPartsInWarehouse();
-    partsToggle.addEventListener("change", (e) => {
-      setShowArchivedPartsInWarehouse(!!e.target.checked);
+    if (typeof syncWarehouseToggleButtonState === "function") {
+      syncWarehouseToggleButtonState(partsToggle, shouldShowArchivedPartsInWarehouse());
+    }
+    partsToggle.addEventListener("click", () => {
+      setShowArchivedPartsInWarehouse(!shouldShowArchivedPartsInWarehouse());
       renderWarehouse();
     });
   }
 
   if (alertsToggle) {
-    alertsToggle.checked = shouldShowOnlyAlertsPartsInWarehouse();
-    alertsToggle.addEventListener("change", (e) => {
-      setShowOnlyAlertsPartsInWarehouse(!!e.target.checked);
+    if (typeof syncWarehouseToggleButtonState === "function") {
+      syncWarehouseToggleButtonState(alertsToggle, shouldShowOnlyAlertsPartsInWarehouse());
+    }
+    alertsToggle.addEventListener("click", () => {
+      setShowOnlyAlertsPartsInWarehouse(!shouldShowOnlyAlertsPartsInWarehouse());
       renderWarehouse();
     });
   }
 
   if (machinesToggle) {
-    machinesToggle.checked = shouldShowArchivedMachinesInStock();
-    machinesToggle.addEventListener("change", (e) => {
-      setShowArchivedMachinesInStock(!!e.target.checked);
+    if (typeof syncWarehouseToggleButtonState === "function") {
+      syncWarehouseToggleButtonState(machinesToggle, shouldShowArchivedMachinesInStock());
+    }
+    machinesToggle.addEventListener("click", () => {
+      setShowArchivedMachinesInStock(!shouldShowArchivedMachinesInStock());
       renderMachinesStock();
     });
   }

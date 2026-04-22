@@ -296,34 +296,28 @@ p {
 }
 
 
-.archive-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: var(--text-sm);
-  font-weight: var(--font-medium);
-  color: var(--text-secondary);
-  cursor: pointer;
-  user-select: none;
-  white-space: nowrap;
+.warehouse-filter-toggle {
+  position: relative;
 }
 
-.archive-toggle input[type="checkbox"] {
-  width: 14px;
-  height: 14px;
-  margin: 0;
-  accent-color: var(--accent);
-  cursor: pointer;
+.warehouse-filter-toggle[aria-pressed="true"],
+.warehouse-filter-toggle.is-active {
+  background: rgba(122, 162, 247, 0.12);
+  border-color: rgba(122, 162, 247, 0.42);
+  color: var(--accent-light);
+  box-shadow: inset 0 0 0 1px rgba(122, 162, 247, 0.08);
 }
 
-.archive-toggle span {
-  line-height: 1.2;
+.warehouse-filter-toggle[aria-pressed="true"]:hover:not(:disabled),
+.warehouse-filter-toggle.is-active:hover:not(:disabled) {
+  background: rgba(122, 162, 247, 0.16);
+  border-color: rgba(122, 162, 247, 0.5);
 }
 
 @media (max-width: 900px) {
-  .archive-toggle {
+  .warehouse-filter-toggle {
     width: 100%;
-    justify-content: flex-end;
+    justify-content: center;
   }
 }
 
@@ -2845,6 +2839,10 @@ body.part-details-open {
 /* ---------- 31) Stock Adjustments ---------- */
 .warehouse-header-actions {
   justify-content: flex-end;
+}
+
+.warehouse-header-actions .warehouse-filter-toggle {
+  flex: 0 0 auto;
 }
 
 .warehouse-edit-actions {

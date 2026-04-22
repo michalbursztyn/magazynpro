@@ -763,7 +763,7 @@ tbody tr:nth-child(even):hover {
 }
 
 .table-section-card.table-section-card-paginated {
-  --paginated-section-height: min(78vh, 860px);
+  --paginated-section-height: min(82vh, 900px);
   display: flex;
   flex-direction: column;
   height: var(--paginated-section-height);

@@ -659,13 +659,13 @@ function renderDelivery() {
   const itemsCountEl = document.getElementById("itemsCount");
   const itemsTotalEl = document.getElementById("itemsTotal");
   const finalizeBtn = document.getElementById("finalizeDeliveryBtn");
-  const hasSupplier = !!normalize(state.currentDelivery?.supplier);
-  const hasDate = !!normalize(state.currentDelivery?.dateISO);
-  const hasInvoiceNumber = !!normalize(state.currentDelivery?.invoiceNumber);
+  const canFinalize = typeof isCurrentDeliveryFinalizable === "function"
+    ? isCurrentDeliveryFinalizable()
+    : false;
   
   if (itemsCountEl) itemsCountEl.textContent = String(items.length);
   if (itemsTotalEl) itemsTotalEl.textContent = fmtPLN.format(total);
-  if (finalizeBtn) finalizeBtn.disabled = items.length === 0 || !hasSupplier || !hasDate || !hasInvoiceNumber;
+  if (finalizeBtn) finalizeBtn.disabled = !canFinalize;
 }
 
 

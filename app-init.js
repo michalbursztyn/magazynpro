@@ -1,5 +1,45 @@
 // === INIT & BINDINGS ===
 
+function showDraftSyncNotifications(summary = {}, options = {}) {
+  const notifySupplierReset = options?.notifySupplierReset === true;
+  const deliveryItemsRemoved = Math.max(0, Number(summary?.deliveryItemsRemoved) || 0);
+  const buildItemsRemoved = Math.max(0, Number(summary?.buildItemsRemoved) || 0);
+  const deliverySupplierCleared = summary?.deliverySupplierCleared === true;
+
+  if (notifySupplierReset && deliverySupplierCleared) {
+    toast(
+      'Dostawca niedostępny',
+      'Wybrany wcześniej dostawca nie jest już dostępny aktywnie. Wybierz go ponownie przed finalizacją dostawy.',
+      'warning'
+    );
+  }
+
+  if (!deliveryItemsRemoved && !buildItemsRemoved) return;
+
+  let message = '';
+  if (deliveryItemsRemoved && buildItemsRemoved) {
+    message = 'Część pozycji draftu dostawy i produkcji została automatycznie usunięta, bo powiązana część albo maszyna nie jest już aktywnie dostępna. Sprawdź oba drafty ponownie.';
+  } else if (deliveryItemsRemoved) {
+    message = 'Część pozycji draftu dostawy została automatycznie usunięta, bo powiązana część nie jest już aktywnie dostępna. Sprawdź draft ponownie.';
+  } else {
+    message = 'Część pozycji draftu produkcji została automatycznie usunięta, bo powiązana maszyna nie jest już aktywnie dostępna. Sprawdź draft ponownie.';
+  }
+
+  toast('Draft zaktualizowany', message, 'warning', { duration: 4200 });
+}
+
+function resetStockAdjustmentsAfterReload(reason = 'Dane magazynowe zmieniły się podczas odświeżania. Tryb korekty został zresetowany dla bezpieczeństwa.') {
+  ensureUiState();
+  const hadPendingAdjustments = Object.keys(state.ui?.pendingStockAdjustments || {}).length > 0;
+  const hadEditMode = !!state.ui?.stockEditMode;
+  if (!hadPendingAdjustments && !hadEditMode) return false;
+
+  state.ui.stockEditMode = false;
+  state.ui.pendingStockAdjustments = {};
+  toast('Korekty zresetowane', reason, 'warning', { duration: 4200 });
+  return true;
+}
+
 async function loadCatalogsFromSupabaseIntoState(options = {}) {
   const silent = options?.silent === true;
   const preserveUi = options?.preserveUi !== false;
@@ -9,24 +49,26 @@ async function loadCatalogsFromSupabaseIntoState(options = {}) {
   }
 
   const uiSnapshot = preserveUi ? {
-    stockEditMode: !!state.ui?.stockEditMode,
-    pendingStockAdjustments: { ...(state.ui?.pendingStockAdjustments || {}) },
     showArchivedPartsInWarehouse: shouldShowArchivedPartsInWarehouse(),
     showOnlyAlertsPartsInWarehouse: shouldShowOnlyAlertsPartsInWarehouse(),
     showArchivedMachinesInStock: shouldShowArchivedMachinesInStock()
   } : null;
 
+  const hadStockEditSession = !!state.ui?.stockEditMode || Object.keys(state.ui?.pendingStockAdjustments || {}).length > 0;
   const catalogState = await window.fetchCatalogStateFromSupabase();
-  applyCatalogState(catalogState);
+  const draftSyncSummary = applyCatalogState(catalogState) || {};
 
   if (uiSnapshot) {
     ensureUiState();
-    state.ui.stockEditMode = uiSnapshot.stockEditMode;
-    state.ui.pendingStockAdjustments = uiSnapshot.pendingStockAdjustments;
     state.ui.showArchivedPartsInWarehouse = uiSnapshot.showArchivedPartsInWarehouse;
     state.ui.showOnlyAlertsPartsInWarehouse = uiSnapshot.showOnlyAlertsPartsInWarehouse;
     state.ui.showArchivedMachinesInStock = uiSnapshot.showArchivedMachinesInStock;
   }
+
+  if (hadStockEditSession) {
+    resetStockAdjustmentsAfterReload();
+  }
+  showDraftSyncNotifications(draftSyncSummary, { notifySupplierReset: true });
 
   save();
 
@@ -51,24 +93,26 @@ async function loadOperationalStateFromSupabaseIntoState(options = {}) {
   }
 
   const uiSnapshot = preserveUi ? {
-    stockEditMode: !!state.ui?.stockEditMode,
-    pendingStockAdjustments: { ...(state.ui?.pendingStockAdjustments || {}) },
     showArchivedPartsInWarehouse: shouldShowArchivedPartsInWarehouse(),
     showOnlyAlertsPartsInWarehouse: shouldShowOnlyAlertsPartsInWarehouse(),
     showArchivedMachinesInStock: shouldShowArchivedMachinesInStock()
   } : null;
 
+  const hadStockEditSession = !!state.ui?.stockEditMode || Object.keys(state.ui?.pendingStockAdjustments || {}).length > 0;
   const operationalState = await window.fetchOperationalStateFromSupabase();
-  applyOperationalState(operationalState);
+  const draftSyncSummary = applyOperationalState(operationalState) || {};
 
   if (uiSnapshot) {
     ensureUiState();
-    state.ui.stockEditMode = uiSnapshot.stockEditMode;
-    state.ui.pendingStockAdjustments = uiSnapshot.pendingStockAdjustments;
     state.ui.showArchivedPartsInWarehouse = uiSnapshot.showArchivedPartsInWarehouse;
     state.ui.showOnlyAlertsPartsInWarehouse = uiSnapshot.showOnlyAlertsPartsInWarehouse;
     state.ui.showArchivedMachinesInStock = uiSnapshot.showArchivedMachinesInStock;
   }
+
+  if (hadStockEditSession) {
+    resetStockAdjustmentsAfterReload();
+  }
+  showDraftSyncNotifications(draftSyncSummary, { notifySupplierReset: false });
 
   save();
 
@@ -603,23 +647,32 @@ function rebuildDeliveryPartSelect(supplierName, opts = {}) {
 }
 
 function syncDeliveryDraftUI(opts = {}) {
-  const { keepSelectedPart = true } = opts;
+  const { keepSelectedPart = true, notifySupplierReset = true } = opts;
   const supplierSelect = document.getElementById('supplierSelect');
   const dateInput = document.getElementById('deliveryDate');
   const invoiceInput = document.getElementById('deliveryInvoiceNumber');
   if (!supplierSelect) return;
 
+  const beforeDeliveryCount = Array.isArray(state.currentDelivery?.items) ? state.currentDelivery.items.length : 0;
+  const draftSupplierBeforeSync = normalize(state.currentDelivery?.supplier);
   const supplierNames = getActiveSupplierNames();
   if (Array.isArray(state.currentDelivery?.items)) {
     state.currentDelivery.items = state.currentDelivery.items.filter(item => !isPartArchived(item?.sku));
   }
   let draftSupplier = normalize(state.currentDelivery?.supplier);
-  if (draftSupplier && !supplierNames.includes(draftSupplier)) {
-    const hasDraftItems = Array.isArray(state.currentDelivery?.items) && state.currentDelivery.items.length > 0;
-    if (!hasDraftItems) {
-      draftSupplier = '';
-      state.currentDelivery.supplier = null;
-    }
+  const supplierWasCleared = !!draftSupplier && !supplierNames.includes(draftSupplier);
+  if (supplierWasCleared) {
+    draftSupplier = '';
+    state.currentDelivery.supplier = null;
+  }
+
+  const removedDeliveryItems = Math.max(0, beforeDeliveryCount - (Array.isArray(state.currentDelivery?.items) ? state.currentDelivery.items.length : 0));
+  if (supplierWasCleared || removedDeliveryItems > 0) {
+    showDraftSyncNotifications({
+      deliveryItemsRemoved: removedDeliveryItems,
+      buildItemsRemoved: 0,
+      deliverySupplierCleared: supplierWasCleared && !!draftSupplierBeforeSync
+    }, { notifySupplierReset });
   }
 
   supplierSelect.value = draftSupplier || '';
@@ -1966,6 +2019,10 @@ function clearAccountPasswordForm() {
   setAccountPasswordError("");
 }
 
+function isAppAccessReady() {
+  return hasAppAccess() && window.__appAccessConfirmed === true;
+}
+
 function updateAuthUI() {
   const {
     panelStatusText,
@@ -1977,8 +2034,9 @@ function updateAuthUI() {
     settingsPanel
   } = getAuthElements();
   const loggedIn = !!window.appAuth?.session;
+  const accessReady = isAppAccessReady();
 
-  setAuthLocked(!loggedIn);
+  setAuthLocked(!accessReady);
 
   if (!loggedIn) {
     if (panelStatusText) panelStatusText.textContent = "—";
@@ -1999,17 +2057,19 @@ function updateAuthUI() {
   const role = window.appAuth?.companyRole || window.appAuth?.membership?.role || "—";
   const companyName = window.appAuth?.companyName || window.appAuth?.companyId || "—";
 
-  if (panelStatusText) panelStatusText.textContent = "ZALOGOWANO";
+  if (panelStatusText) panelStatusText.textContent = accessReady ? "ZALOGOWANO" : "SPRAWDZANIE DOSTĘPU";
   if (panelCompanyName) panelCompanyName.textContent = companyName;
   if (accountEmailDisplay) accountEmailDisplay.textContent = email;
   if (accountCompanyDisplay) accountCompanyDisplay.textContent = companyName;
   if (accountRoleDisplay) accountRoleDisplay.textContent = String(role).toUpperCase();
   setAuthError("");
   setAccountPasswordError("");
-  if (loggedIn) applyRoleAccess();
+  if (accessReady) applyRoleAccess();
 }
 
 async function ensureAuthSession() {
+  window.__appAccessConfirmed = false;
+
   if (typeof window.refreshAuthContext !== "function") {
     console.error("Brak refreshAuthContext(). Bramka logowania pozostaje zamknięta.");
     setAuthLocked(true);
@@ -2203,6 +2263,7 @@ function bindAuthUI() {
         : { ok: false };
 
       if (!result?.ok) {
+        window.__appAccessConfirmed = false;
         setAuthLocked(true);
         setAuthError("Nie udało się odświeżyć sesji użytkownika.");
         return;
@@ -2215,24 +2276,41 @@ function bindAuthUI() {
           st.error = result.rolePermissionsError?.message || 'Nie udało się pobrać konfiguracji ról.';
         }
       }
-      updateAuthUI();
-      if (window.appAuth?.session) {
-        refreshRoleAccessUI();
-      }
 
       const hasSession = !!window.appAuth?.session;
-      if (hasSession && !window.__appInitialized) {
+      const hasConfirmedAccess = hasSession && hasAppAccess();
+      const appBootFinished = window.__appInitialized === true;
+
+      if (!hasSession) {
+        window.__appAccessConfirmed = false;
+        window.__appInitialized = false;
+        closeAccountSettings();
+        passwordInput && (passwordInput.value = "");
+        updateAuthUI();
+        return;
+      }
+
+      if (!hasConfirmedAccess) {
+        window.__appAccessConfirmed = false;
+        updateAuthUI();
+        setAuthLocked(true);
+        setAuthError("To konto nie ma aktywnego dostępu do firmy albo zostało dezaktywowane.");
+        return;
+      }
+
+      if (!appBootFinished) {
+        window.__appAccessConfirmed = false;
+        updateAuthUI();
         await init();
         return;
       }
 
-      if (!hasSession) {
-        window.__appInitialized = false;
-        closeAccountSettings();
-        passwordInput && (passwordInput.value = "");
-      }
+      window.__appAccessConfirmed = true;
+      updateAuthUI();
+      refreshRoleAccessUI();
     })().catch((err) => {
       console.error("Auth state change handler error:", err);
+      window.__appAccessConfirmed = false;
       setAuthLocked(true);
       setAuthError("Wystąpił błąd podczas przełączania sesji użytkownika.");
     });
@@ -2249,6 +2327,8 @@ async function init() {
 
   if (window.__appInitialized) return;
   if (window.__appInitPromise) return window.__appInitPromise;
+
+  window.__appAccessConfirmed = false;
 
   const initPromise = (async () => {
   initThresholdsToggle();
@@ -2406,7 +2486,7 @@ async function init() {
     initComboFromSelect(document.getElementById("bomSkuSelect"), { placeholder: "Wybierz część..." });
     initComboFromSelect(document.getElementById("historyAuthorFilter"), { placeholder: "Wszyscy autorzy" });
 
-    syncDeliveryDraftUI({ keepSelectedPart: true });
+    syncDeliveryDraftUI({ keepSelectedPart: true, notifySupplierReset: false });
   } catch (e) {
     console.warn("Combobox init warning:", e);
   }
@@ -2458,8 +2538,11 @@ async function init() {
   }
 
   save();
-  setActiveTab(getDefaultTabForRole());
+  window.__appAccessConfirmed = true;
   window.__appInitialized = true;
+  updateAuthUI();
+  refreshRoleAccessUI({ refreshActiveTab: false });
+  setActiveTab(getDefaultTabForRole());
   })();
 
   window.__appInitPromise = initPromise;

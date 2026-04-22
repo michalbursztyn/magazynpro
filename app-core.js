@@ -140,8 +140,9 @@ function restoreState(data) {
   state.ui.stockEditMode = false;
   state.ui.pendingStockAdjustments = {};
 
-  clearArchivedItemsFromDrafts();
+  const draftSyncSummary = clearArchivedItemsFromDrafts();
   syncIdCounter();
+  return draftSyncSummary;
 }
 
 
@@ -176,8 +177,9 @@ function applyOperationalState(nextOperationalState = {}) {
   state.ui.stockEditMode = false;
   state.ui.pendingStockAdjustments = {};
 
-  clearArchivedItemsFromDrafts();
+  const draftSyncSummary = clearArchivedItemsFromDrafts();
   syncIdCounter();
+  return draftSyncSummary;
 }
 
 function save() {
@@ -323,18 +325,38 @@ function partUsedInAnyActiveMachineBom(skuRaw) {
   return (state.machineCatalog || []).find(machine => !machine?.archived && Array.isArray(machine?.bom) && machine.bom.some(item => skuKey(item?.sku) === k)) || null;
 }
 
+function isDeliverySupplierAvailable(nameRaw) {
+  const supplierName = normalize(nameRaw);
+  if (!supplierName) return false;
+  const supplier = state.suppliers.get(supplierName);
+  return !!supplier && supplier?.archived !== true;
+}
+
 function clearArchivedItemsFromDrafts() {
+  const summary = {
+    deliveryItemsRemoved: 0,
+    buildItemsRemoved: 0,
+    deliverySupplierCleared: false
+  };
+
   if (state.currentDelivery && Array.isArray(state.currentDelivery.items)) {
+    const beforeDeliveryCount = state.currentDelivery.items.length;
     state.currentDelivery.items = state.currentDelivery.items.filter(item => !isPartArchived(item?.sku));
-    if (isSupplierArchived(state.currentDelivery?.supplier)) {
+    summary.deliveryItemsRemoved = Math.max(0, beforeDeliveryCount - state.currentDelivery.items.length);
+
+    if (normalize(state.currentDelivery?.supplier) && !isDeliverySupplierAvailable(state.currentDelivery?.supplier)) {
       state.currentDelivery.supplier = null;
-      state.currentDelivery.items = [];
+      summary.deliverySupplierCleared = true;
     }
   }
 
   if (state.currentBuild && Array.isArray(state.currentBuild.items)) {
+    const beforeBuildCount = state.currentBuild.items.length;
     state.currentBuild.items = state.currentBuild.items.filter(item => !isMachineArchived(item?.machineCode));
+    summary.buildItemsRemoved = Math.max(0, beforeBuildCount - state.currentBuild.items.length);
   }
+
+  return summary;
 }
 
 function applyCatalogState(nextCatalogState = {}) {
@@ -372,8 +394,9 @@ function applyCatalogState(nextCatalogState = {}) {
       : []
   })).filter(machine => machine.code && machine.name);
 
-  clearArchivedItemsFromDrafts();
+  const draftSyncSummary = clearArchivedItemsFromDrafts();
   syncIdCounter();
+  return draftSyncSummary;
 }
 
 function applyPartNameChangeAcrossOperationalState(partSkuRaw, nextNameRaw) {
@@ -673,6 +696,15 @@ function addToDelivery(supplier, skuRaw, qty, price) {
   renderDelivery();
 }
 
+function isCurrentDeliveryFinalizable() {
+  const delivery = state.currentDelivery || {};
+  const hasItems = Array.isArray(delivery.items) && delivery.items.length > 0;
+  const hasSupplier = isDeliverySupplierAvailable(delivery?.supplier);
+  const hasInvoiceNumber = !!normalize(delivery?.invoiceNumber);
+  const dateValidation = validateDateISO(delivery?.dateISO, { allowFuture: false, maxPastYears: 5 });
+  return hasItems && hasSupplier && hasInvoiceNumber && !!dateValidation?.valid;
+}
+
 async function finalizeDelivery() {
   if (_finalizeDeliveryBusy) {
     toast("Operacja w toku", "Przetwarzanie dostawy już trwa - proszę czekać.", "warning");
@@ -693,6 +725,14 @@ async function finalizeDelivery() {
     const d = state.currentDelivery;
     if (!d.items.length) {
       toast("Brak pozycji", "Dodaj przynajmniej jedną pozycję do dostawy.", "warning");
+      return;
+    }
+    if (!isDeliverySupplierAvailable(d.supplier)) {
+      state.currentDelivery.supplier = null;
+      save();
+      renderDelivery();
+      toast("Dostawca niedostępny", "Wybrany wcześniej dostawca nie jest już aktywnie dostępny. Wybierz go ponownie przed finalizacją.", "warning");
+      document.getElementById("supplierSelect")?.focus?.();
       return;
     }
     if (!d.dateISO) {

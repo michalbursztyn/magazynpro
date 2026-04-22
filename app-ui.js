@@ -29,6 +29,135 @@ function escapeHtml(s) {
 }
 
 
+const TABLE_PAGE_SIZE = 50;
+
+function ensureTablePaginationState() {
+  if (!state.ui || typeof state.ui !== 'object') state.ui = {};
+  if (!state.ui.tablePagination || typeof state.ui.tablePagination !== 'object') {
+    state.ui.tablePagination = {};
+  }
+  return state.ui.tablePagination;
+}
+
+function getTablePage(tableKey) {
+  const pagination = ensureTablePaginationState();
+  const raw = Number(pagination[tableKey]);
+  return Number.isFinite(raw) && raw >= 1 ? Math.floor(raw) : 1;
+}
+
+function resetTablePage(tableKey) {
+  const pagination = ensureTablePaginationState();
+  pagination[tableKey] = 1;
+  return 1;
+}
+
+function clampTablePage(tableKey, totalPages) {
+  const pagination = ensureTablePaginationState();
+  const safeTotalPages = Math.max(1, Number(totalPages) || 1);
+  const nextPage = Math.min(Math.max(getTablePage(tableKey), 1), safeTotalPages);
+  pagination[tableKey] = nextPage;
+  return nextPage;
+}
+
+function getPaginationRenderer(tableKey) {
+  const renderers = {
+    warehouse_parts: () => renderWarehouse(),
+    history: () => renderHistory(),
+    catalog_parts: () => refreshCatalogsUI(),
+    catalog_suppliers: () => renderAllSuppliers(),
+    catalog_machines: () => refreshCatalogsUI(),
+    warehouse_machines: () => renderMachinesStock()
+  };
+  return renderers[tableKey] || null;
+}
+
+function changeTablePage(tableKey, delta) {
+  const pagination = ensureTablePaginationState();
+  const current = getTablePage(tableKey);
+  pagination[tableKey] = Math.max(1, current + Number(delta || 0));
+  const rerender = getPaginationRenderer(tableKey);
+  if (typeof rerender === 'function') rerender();
+}
+
+window.changeTablePage = changeTablePage;
+window.resetTablePage = resetTablePage;
+
+function paginateTableRows(tableKey, rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  if (list.length <= TABLE_PAGE_SIZE) {
+    resetTablePage(tableKey);
+    return {
+      rows: list,
+      page: 1,
+      totalPages: 1,
+      totalRows: list.length,
+      isEnabled: false
+    };
+  }
+
+  const totalPages = Math.max(1, Math.ceil(list.length / TABLE_PAGE_SIZE));
+  const page = clampTablePage(tableKey, totalPages);
+  const start = (page - 1) * TABLE_PAGE_SIZE;
+
+  return {
+    rows: list.slice(start, start + TABLE_PAGE_SIZE),
+    page,
+    totalPages,
+    totalRows: list.length,
+    isEnabled: true
+  };
+}
+
+function getTablePaginationMount(tableElement) {
+  if (!tableElement) return null;
+  const host = tableElement.closest('.table-container') || tableElement.parentElement;
+  if (!host || !host.parentElement) return null;
+
+  const tableId = tableElement.id || host.getAttribute('data-pagination-table-id') || '';
+  if (!tableId) return null;
+  host.setAttribute('data-pagination-table-id', tableId);
+
+  let mount = host.nextElementSibling;
+  if (!mount || !mount.classList?.contains('table-pagination')) {
+    mount = document.createElement('div');
+    mount.className = 'table-pagination';
+    host.insertAdjacentElement('afterend', mount);
+  }
+
+  mount.setAttribute('data-pagination-for', tableId);
+  return mount;
+}
+
+function renderTablePagination(tableSelector, tableKey, meta) {
+  const tableElement = document.querySelector(tableSelector);
+  if (!tableElement) return;
+
+  const mount = getTablePaginationMount(tableElement);
+  if (!mount) return;
+
+  const totalRows = Number(meta?.totalRows) || 0;
+  const totalPages = Math.max(1, Number(meta?.totalPages) || 1);
+  const page = Math.min(Math.max(Number(meta?.page) || 1, 1), totalPages);
+  const isEnabled = totalRows > TABLE_PAGE_SIZE && totalPages > 1;
+
+  if (!isEnabled) {
+    mount.innerHTML = '';
+    mount.classList.add('hidden');
+    return;
+  }
+
+  mount.classList.remove('hidden');
+  mount.innerHTML = `
+    <div class="table-pagination-inner">
+      <button type="button" class="table-pagination-btn" aria-label="Poprzednia strona" ${page <= 1 ? 'disabled' : ''} onclick="changeTablePage('${escapeHtml(tableKey)}', -1)">&lt;</button>
+      <span class="table-pagination-label">Strona ${page} z ${totalPages}</span>
+      <button type="button" class="table-pagination-btn" aria-label="Następna strona" ${page >= totalPages ? 'disabled' : ''} onclick="changeTablePage('${escapeHtml(tableKey)}', 1)">&gt;</button>
+    </div>
+  `;
+}
+
+
+
 function ensureToastHost() {
   if (typeof document === 'undefined') return null;
   let host = document.querySelector('.toast-host');
@@ -565,9 +694,12 @@ function renderWarehouse() {
     }
   }
 
-  els.summaryTable.innerHTML = summaryRows
+  const sortedSummaryRows = summaryRows
     .slice()
-    .sort((a, b) => (safeQtyInt(a.qty) - safeQtyInt(b.qty)) || String(a.sku).localeCompare(String(b.sku), 'pl'))
+    .sort((a, b) => (safeQtyInt(a.qty) - safeQtyInt(b.qty)) || String(a.sku).localeCompare(String(b.sku), 'pl'));
+  const paginatedSummary = paginateTableRows('warehouse_parts', sortedSummaryRows);
+
+  els.summaryTable.innerHTML = paginatedSummary.rows
     .map(item => {
       const pending = pendingMap[skuKey(item.sku)];
       const isInvalid = !!pending?.invalid;
@@ -624,6 +756,7 @@ function renderWarehouse() {
       `;
     }).join("");
 
+  renderTablePagination('#skuSummaryTable', 'warehouse_parts', paginatedSummary);
   renderSidePanel();
 }
 
@@ -882,9 +1015,12 @@ function renderMachinesStock() {
   const tbody = document.querySelector("#machinesStockTable tbody");
   if (!tbody) return;
 
-  tbody.innerHTML = state.machinesStock
+  const filteredMachinesStockRows = state.machinesStock
     .filter(m => showArchived || !isMachineArchived(m?.code))
-    .filter(m => !q || m.name.toLowerCase().includes(q) || m.code.toLowerCase().includes(q))
+    .filter(m => !q || m.name.toLowerCase().includes(q) || m.code.toLowerCase().includes(q));
+  const paginatedMachinesStock = paginateTableRows('warehouse_machines', filteredMachinesStockRows);
+
+  tbody.innerHTML = paginatedMachinesStock.rows
     .map(m => {
       const isArchived = isMachineArchived(m?.code);
       return `<tr>
@@ -898,6 +1034,8 @@ function renderMachinesStock() {
       <td>${isArchived ? '<span class="badge badge-muted badge-status-warning">ZARCHIWIZOWANE</span>' : '<span class="catalog-status-empty" aria-hidden="true"></span>'}</td>
     </tr>`;
     }).join("");
+
+  renderTablePagination('#machinesStockTable', 'warehouse_machines', paginatedMachinesStock);
 }
 
 function getHistoryView() {
@@ -1054,6 +1192,7 @@ function renderHistory() {
     .slice()
     .sort((a, b) => (b.ts || 0) - (a.ts || 0))
     .filter(ev => historyMatchesFilters(ev, view, qNorm, fromISO, toISO, authorKey));
+  const paginatedHistory = paginateTableRows('history', rows);
 
   if (!rows.length) {
     const msg = (view === "all")
@@ -1064,10 +1203,11 @@ function renderHistory() {
           ? "Brak produkcji w historii dla wybranych filtrów."
           : "Brak korekt w historii dla wybranych filtrów.";
     tbody.innerHTML = `<tr><td colspan="4" class="text-muted" style="text-align:center;padding:var(--space-6)">${msg}</td></tr>`;
+    renderTablePagination('#historyTable', 'history', { totalRows: 0, totalPages: 1, page: 1 });
     return;
   }
 
-  tbody.innerHTML = rows.map(ev => {
+  tbody.innerHTML = paginatedHistory.rows.map(ev => {
     const date = fmtDateISO(ev.dateISO);
     let summary = "";
 
@@ -1138,6 +1278,7 @@ function renderHistory() {
     `;
   }).join("");
 
+  renderTablePagination('#historyTable', 'history', paginatedHistory);
   renderSideRecentActions5();
 }
 
@@ -1979,9 +2120,12 @@ function renderAllSuppliers() {
 
   const q = normalizeCatalogSearchQuery(document.getElementById("searchCatalogSuppliers")?.value);
   
-  tbody.innerHTML = Array.from(state.suppliers.keys())
+  const supplierRows = Array.from(state.suppliers.keys())
     .sort()
-    .filter(name => catalogIncludesQuery(q, name))
+    .filter(name => catalogIncludesQuery(q, name));
+  const paginatedSuppliers = paginateTableRows('catalog_suppliers', supplierRows);
+
+  tbody.innerHTML = paginatedSuppliers.rows
     .map(name => {
       const warnings = getSupplierDataWarnings(name);
       const isArchived = isSupplierArchived(name);
@@ -2008,6 +2152,7 @@ function renderAllSuppliers() {
       `;
     }).join("");
 
+  renderTablePagination('#suppliersListTable', 'catalog_suppliers', paginatedSuppliers);
   renderSelectOptions(document.getElementById("supplierSelect"), getActiveSupplierNames());
 }
 
@@ -2038,8 +2183,11 @@ function refreshCatalogsUI() {
   const machinesQuery = normalizeCatalogSearchQuery(document.getElementById("searchCatalogMachines")?.value);
 
   // Parts catalog
-  els.partsCatalog.innerHTML = parts
-    .filter(p => catalogIncludesQuery(partsQuery, p?.sku, p?.name))
+  const filteredCatalogParts = parts
+    .filter(p => catalogIncludesQuery(partsQuery, p?.sku, p?.name));
+  const paginatedCatalogParts = paginateTableRows('catalog_parts', filteredCatalogParts);
+
+  els.partsCatalog.innerHTML = paginatedCatalogParts.rows
     .map(p => {
       const warnings = getPartDataWarnings(p.sku);
       const suppliers = warnings.suppliers.map(item => item.name);
@@ -2070,9 +2218,14 @@ function refreshCatalogsUI() {
       </tr>`;
     }).join("");
 
+  renderTablePagination('#partsCatalogTable', 'catalog_parts', paginatedCatalogParts);
+
   // Machines catalog
-  els.machinesCatalog.innerHTML = state.machineCatalog
-    .filter(m => catalogIncludesQuery(machinesQuery, m?.code, m?.name))
+  const filteredCatalogMachines = state.machineCatalog
+    .filter(m => catalogIncludesQuery(machinesQuery, m?.code, m?.name));
+  const paginatedCatalogMachines = paginateTableRows('catalog_machines', filteredCatalogMachines);
+
+  els.machinesCatalog.innerHTML = paginatedCatalogMachines.rows
     .map(m => {
       const warnings = getMachineDataWarnings(m.code);
       const isArchived = !!m?.archived;
@@ -2100,6 +2253,8 @@ function refreshCatalogsUI() {
         </tr>
       `;
     }).join("");
+
+  renderTablePagination('#machinesCatalogTable', 'catalog_machines', paginatedCatalogMachines);
 
   // Machine select
   renderSelectOptions(els.machineSelect, getActiveMachineCatalog().map(m => m.code), c => {

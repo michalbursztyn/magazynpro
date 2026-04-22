@@ -789,6 +789,67 @@ tbody tr:nth-child(even):hover {
   }
 }
 
+.table-pagination {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--space-3);
+}
+
+.table-pagination.hidden {
+  display: none !important;
+}
+
+.table-pagination-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.table-pagination-label {
+  min-width: 104px;
+  text-align: center;
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  color: var(--text-secondary);
+}
+
+.table-pagination-btn {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+  color: var(--text);
+  font: inherit;
+  font-weight: var(--font-semibold);
+  cursor: pointer;
+  transition: background var(--trans-fast), border-color var(--trans-fast), color var(--trans-fast), opacity var(--trans-fast);
+}
+
+.table-pagination-btn:hover:not(:disabled) {
+  background: var(--surface-3);
+  border-color: var(--border-strong);
+}
+
+.table-pagination-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .table-pagination {
+    justify-content: center;
+  }
+}
+
 /* Right aligned cells */
 .text-right {
   text-align: right;

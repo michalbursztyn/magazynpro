@@ -200,6 +200,7 @@ function setHistoryView(view) {
   }
 
   localStorage.setItem(HISTORY_VIEW_KEY, v);
+  if (typeof resetTablePage === 'function') resetTablePage('history');
   renderHistory();
 }
 
@@ -227,6 +228,7 @@ function clearHistoryFilters() {
   if (search) search.value = "";
   if (date) date.value = "";
   if (author) author.value = "";
+  if (typeof resetTablePage === 'function') resetTablePage('history');
 
   if (author && typeof refreshComboFromSelect === "function") {
     try { refreshComboFromSelect(author, { placeholder: "Wszyscy autorzy" }); } catch {}
@@ -298,9 +300,9 @@ function initHistoryFilters() {
   const search = document.getElementById("historySearch");
   const date = document.getElementById("historyDateRange");
   const author = document.getElementById("historyAuthorFilter");
-  if (search) search.addEventListener("input", debounce(() => renderHistory(), 200));
-  if (date) date.addEventListener("input", debounce(() => renderHistory(), 300));
-  if (author) author.addEventListener("change", () => renderHistory());
+  if (search) search.addEventListener("input", debounce(() => { if (typeof resetTablePage === 'function') resetTablePage('history'); renderHistory(); }, 200));
+  if (date) date.addEventListener("input", debounce(() => { if (typeof resetTablePage === 'function') resetTablePage('history'); renderHistory(); }, 300));
+  if (author) author.addEventListener("change", () => { if (typeof resetTablePage === 'function') resetTablePage('history'); renderHistory(); });
 }
 
 function initSidePanelSignals() {
@@ -415,6 +417,7 @@ function initWarehouseArchiveToggles() {
     }
     partsToggle.addEventListener("click", () => {
       setShowArchivedPartsInWarehouse(!shouldShowArchivedPartsInWarehouse());
+      if (typeof resetTablePage === 'function') resetTablePage('warehouse_parts');
       renderWarehouse();
     });
   }
@@ -425,6 +428,7 @@ function initWarehouseArchiveToggles() {
     }
     alertsToggle.addEventListener("click", () => {
       setShowOnlyAlertsPartsInWarehouse(!shouldShowOnlyAlertsPartsInWarehouse());
+      if (typeof resetTablePage === 'function') resetTablePage('warehouse_parts');
       renderWarehouse();
     });
   }
@@ -435,6 +439,7 @@ function initWarehouseArchiveToggles() {
     }
     machinesToggle.addEventListener("click", () => {
       setShowArchivedMachinesInStock(!shouldShowArchivedMachinesInStock());
+      if (typeof resetTablePage === 'function') resetTablePage('warehouse_machines');
       renderMachinesStock();
     });
   }
@@ -3844,19 +3849,19 @@ function bindSearch() {
   const catalogSuppliersSearch = document.getElementById("searchCatalogSuppliers");
   
   if (partsSearch) {
-    partsSearch.addEventListener("input", debounce(() => renderWarehouse(), 200));
+    partsSearch.addEventListener("input", debounce(() => { if (typeof resetTablePage === 'function') resetTablePage('warehouse_parts'); renderWarehouse(); }, 200));
   }
   if (machinesSearch) {
-    machinesSearch.addEventListener("input", debounce(() => renderMachinesStock(), 200));
+    machinesSearch.addEventListener("input", debounce(() => { if (typeof resetTablePage === 'function') resetTablePage('warehouse_machines'); renderMachinesStock(); }, 200));
   }
   if (catalogPartsSearch) {
-    catalogPartsSearch.addEventListener("input", debounce(() => refreshCatalogsUI(), 200));
+    catalogPartsSearch.addEventListener("input", debounce(() => { if (typeof resetTablePage === 'function') resetTablePage('catalog_parts'); refreshCatalogsUI(); }, 200));
   }
   if (catalogMachinesSearch) {
-    catalogMachinesSearch.addEventListener("input", debounce(() => refreshCatalogsUI(), 200));
+    catalogMachinesSearch.addEventListener("input", debounce(() => { if (typeof resetTablePage === 'function') resetTablePage('catalog_machines'); refreshCatalogsUI(); }, 200));
   }
   if (catalogSuppliersSearch) {
-    catalogSuppliersSearch.addEventListener("input", debounce(() => renderAllSuppliers(), 200));
+    catalogSuppliersSearch.addEventListener("input", debounce(() => { if (typeof resetTablePage === 'function') resetTablePage('catalog_suppliers'); renderAllSuppliers(); }, 200));
   }
 }
 

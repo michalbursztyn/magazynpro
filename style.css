@@ -3100,9 +3100,10 @@ body.part-details-open {
   overflow: hidden;
 }
 
-.operation-grid {
+.operation-grid,
+.operation-grid-build {
   display: grid;
-  grid-template-columns: minmax(0, 1.08fr) minmax(320px, 0.92fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: clamp(20px, 2vw, 32px);
   align-items: start;
 }
@@ -3113,10 +3114,6 @@ body.part-details-open {
   min-height: 0;
   height: 100%;
   align-items: stretch;
-}
-
-.operation-grid-build {
-  grid-template-columns: minmax(0, 1.02fr) minmax(340px, 0.98fr);
 }
 
 .operation-main,
@@ -3131,7 +3128,8 @@ body.part-details-open {
 }
 
 .operation-main {
-  max-width: 720px;
+  width: 100%;
+  max-width: none;
 }
 
 .operation-side {

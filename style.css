@@ -288,6 +288,8 @@ p {
 }
 
 .cardHeader {
+  position: relative;
+  z-index: 20;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
@@ -295,6 +297,7 @@ p {
   margin-bottom: var(--space-4);
   padding-bottom: var(--space-3);
   border-bottom: 1px solid var(--border);
+  overflow: visible;
 }
 
 .cardHeader h2 {
@@ -323,9 +326,15 @@ p {
 .inline-action-popover-anchor {
   --inline-popover-width: min(360px, calc(100vw - 32px));
   position: relative;
+  z-index: 30;
+  isolation: isolate;
   display: inline-flex;
   align-items: center;
   flex: 0 0 auto;
+}
+
+.inline-action-popover-anchor.is-open {
+  z-index: 180;
 }
 
 .inline-action-popover {
@@ -334,7 +343,7 @@ p {
   left: 50%;
   width: var(--inline-popover-width);
   max-width: calc(100vw - 24px);
-  z-index: 40;
+  z-index: 190;
   opacity: 1;
   transform: translateX(-50%) translateY(0);
   transition: opacity var(--trans-base), transform var(--trans-base), visibility var(--trans-base);
@@ -781,6 +790,11 @@ tbody tr:nth-child(even):hover {
   min-height: var(--main-section-card-height);
   max-height: var(--main-section-card-height);
   overflow: hidden;
+}
+
+.tabPanel[data-tab-panel="parts"] > .card.main-section-card-height,
+.tabPanel[data-tab-panel="catalog_suppliers"] > .card.main-section-card-height {
+  overflow: visible;
 }
 
 .table-section-shell.table-section-shell-paginated {

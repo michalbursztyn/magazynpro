@@ -375,6 +375,7 @@ function initInlineActionPopover(config = {}) {
 
   const setPanelOpen = (isOpen) => {
     const nextOpen = !!isOpen;
+    anchor.classList.toggle("is-open", nextOpen);
     panel.classList.toggle("collapsed", !nextOpen);
     panel.setAttribute("aria-hidden", nextOpen ? "false" : "true");
     btn.setAttribute("aria-expanded", nextOpen ? "true" : "false");
@@ -438,6 +439,23 @@ function initThresholdsToggle() {
   });
 }
 
+function focusSupplierPopoverInput() {
+  const input = document.getElementById("supplierNameInput");
+  if (!input) return;
+
+  const applyFocus = () => {
+    input.focus({ preventScroll: true });
+    input.select?.();
+  };
+
+  applyFocus();
+  window.requestAnimationFrame(() => {
+    if (document.activeElement !== input) {
+      applyFocus();
+    }
+  });
+}
+
 function initSupplierAddPopover() {
   const api = initInlineActionPopover({
     anchorId: "supplierAddPopoverAnchor",
@@ -445,9 +463,7 @@ function initSupplierAddPopover() {
     buttonId: "toggleSupplierPopoverBtn",
     boundKey: "supplierPopoverBound",
     onOpen: () => {
-      window.setTimeout(() => {
-        document.getElementById("supplierNameInput")?.focus?.();
-      }, 0);
+      focusSupplierPopoverInput();
     },
     onClose: () => {
       const input = document.getElementById("supplierNameInput");

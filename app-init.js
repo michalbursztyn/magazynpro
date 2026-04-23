@@ -1463,7 +1463,9 @@ function renderRolePermissionsPanel() {
                     title="${escapeHtml(feature.description)}"
                     ${isEditableRole && !disabledByTab ? '' : 'disabled'}>
                     <span class="role-feature-chip-label">${escapeHtml(feature.label)}</span>
-                    <span class="role-feature-chip-state">${disabledByTab ? 'Wyłączone z kartą' : (rawEnabled ? 'Włączona' : 'Wyłączona')}</span>
+                    <span class="role-feature-chip-indicator" aria-hidden="true">
+                      <span class="role-feature-chip-dot ${effectiveEnabled ? 'is-enabled' : 'is-disabled'}"></span>
+                    </span>
                   </button>
                 `;
               }).join('')}

@@ -1801,20 +1801,20 @@ function renderUsersAdmin() {
 
   const st = window.companyUsersState || { items: [], loading: false, error: '' };
   if (st.loading) {
-    tbody.innerHTML = `<tr><td colspan="4" class="text-muted" style="text-align:center;padding:var(--space-4)">Ładowanie użytkowników...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="3" class="text-muted" style="text-align:center;padding:var(--space-4)">Ładowanie użytkowników...</td></tr>`;
     renderRolePermissionsPanel();
     return;
   }
 
   if (st.error) {
-    tbody.innerHTML = `<tr><td colspan="4" class="text-muted" style="text-align:center;padding:var(--space-4)">${escapeHtml(st.error)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="3" class="text-muted" style="text-align:center;padding:var(--space-4)">${escapeHtml(st.error)}</td></tr>`;
     renderRolePermissionsPanel();
     return;
   }
 
   const items = Array.isArray(st.items) ? st.items : [];
   if (!items.length) {
-    tbody.innerHTML = `<tr><td colspan="4" class="text-muted" style="text-align:center;padding:var(--space-4)">Brak użytkowników w firmie.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="3" class="text-muted" style="text-align:center;padding:var(--space-4)">Brak użytkowników w firmie.</td></tr>`;
     renderRolePermissionsPanel();
     return;
   }
@@ -1827,12 +1827,10 @@ function renderUsersAdmin() {
         <td>
           <div class="user-name-cell">
             <strong>${escapeHtml(meta.fullName)}</strong>
-            <span>${escapeHtml(meta.email)}</span>
           </div>
         </td>
         <td><span class="user-role-text">${escapeHtml(meta.rowRole)}</span></td>
-        <td><span class="status-pill status-pill-${meta.statusCls} user-status-pill">${meta.statusLabel}</span></td>
-        <td class="text-right">
+        <td class="text-right user-actions-cell">
           ${hasUsersManagePermission ? `
             <div class="user-row-actions-clean">
               <button type="button" class="btn btn-secondary btn-sm" data-action="openUserHistory" data-member-id="${escapeHtml(String(item.id))}">Historia</button>

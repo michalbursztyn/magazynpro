@@ -3733,6 +3733,26 @@ body.part-details-open {
   min-width: 100%;
 }
 
+#companyUsersTable {
+  width: 100%;
+  table-layout: fixed;
+}
+
+#companyUsersTable th:nth-child(1),
+#companyUsersTable td:nth-child(1) {
+  width: auto;
+}
+
+#companyUsersTable th:nth-child(2),
+#companyUsersTable td:nth-child(2) {
+  width: 112px;
+}
+
+#companyUsersTable th:nth-child(3),
+#companyUsersTable td:nth-child(3) {
+  width: 168px;
+}
+
 .users-admin-role-header {
   gap: var(--space-2);
 }
@@ -3835,10 +3855,14 @@ body.part-details-open {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
 }
 
 .user-name-cell strong {
   color: var(--text);
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
   word-break: break-word;
 }
 
@@ -3853,6 +3877,7 @@ body.part-details-open {
   min-height: 28px;
   color: var(--text);
   font-weight: var(--font-medium);
+  white-space: nowrap;
 }
 
 .user-row-actions-clean {
@@ -3861,6 +3886,15 @@ body.part-details-open {
   align-items: center;
   gap: var(--space-2);
   flex-wrap: wrap;
+  max-width: 100%;
+}
+
+.user-actions-cell {
+  min-width: 0;
+}
+
+.user-row-actions-clean .btn {
+  padding-inline: 10px;
 }
 
 .user-create-backdrop {
@@ -4345,6 +4379,28 @@ body.user-info-open {
 
   .role-feature-chip {
     flex-basis: 100%;
+  }
+}
+
+
+@media (max-width: 1180px) {
+  #companyUsersTable th:nth-child(2),
+  #companyUsersTable td:nth-child(2) {
+    width: 96px;
+  }
+
+  #companyUsersTable th:nth-child(3),
+  #companyUsersTable td:nth-child(3) {
+    width: 148px;
+  }
+
+  .user-row-actions-clean {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .user-row-actions-clean .btn {
+    width: 100%;
   }
 }
 

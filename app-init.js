@@ -1489,10 +1489,6 @@ function renderRolePermissionsPanel() {
               <span class="status-pill status-pill-${enabled ? 'success' : 'warning'}">${enabled ? 'Aktywna' : 'Wyłączona'}</span>
             </div>
             ${featureTiles}
-            <div class="role-permission-tile-foot role-permission-tile-static">
-              <span>${escapeHtml(tab.id)}</span>
-              <span>${isEditableRole ? 'Kliknij kartę lub chipy' : 'Tylko podgląd'}</span>
-            </div>
           </div>
         `;
       }).join('')}

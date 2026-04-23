@@ -337,6 +337,10 @@ p {
   z-index: 180;
 }
 
+.inline-action-popover-anchor.is-open .inline-action-popover {
+  pointer-events: auto;
+}
+
 .inline-action-popover {
   position: absolute;
   top: calc(100% + var(--space-2));
@@ -347,6 +351,18 @@ p {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
   transition: opacity var(--trans-base), transform var(--trans-base), visibility var(--trans-base);
+}
+
+.inline-action-popover.is-fixed-popover {
+  position: fixed;
+  top: var(--inline-popover-top, 0px);
+  left: var(--inline-popover-left, 0px);
+  z-index: 10050;
+  transform: translateX(-50%) translateY(0);
+}
+
+.inline-action-popover.is-fixed-popover.collapsed {
+  transform: translateX(-50%) translateY(-6px);
 }
 
 .inline-action-popover.collapsed {

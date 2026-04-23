@@ -1829,7 +1829,7 @@ function renderUsersAdmin() {
             <strong>${escapeHtml(meta.fullName)}</strong>
           </div>
         </td>
-        <td><span class="user-role-text">${escapeHtml(meta.rowRole)}</span></td>
+        <td><span class="user-role-chip">${escapeHtml(meta.rowRole)}</span></td>
         <td class="text-right user-actions-cell">
           ${hasUsersManagePermission ? `
             <div class="user-row-actions-clean">

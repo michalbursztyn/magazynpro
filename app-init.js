@@ -490,17 +490,50 @@ function initSupplierAddPopover() {
 }
 
 
+function setWarehousePartsToggleMode(mode = 'default') {
+  ensureUiState();
+
+  const nextMode = mode === 'alerts'
+    ? 'alerts'
+    : mode === 'archived'
+      ? 'archived'
+      : 'default';
+
+  state.ui.showArchivedPartsInWarehouse = nextMode === 'archived';
+  state.ui.showOnlyAlertsPartsInWarehouse = nextMode === 'alerts';
+}
+
+function normalizeWarehousePartsToggleMode() {
+  ensureUiState();
+
+  const showArchived = state.ui.showArchivedPartsInWarehouse === true;
+  const showOnlyAlerts = state.ui.showOnlyAlertsPartsInWarehouse === true;
+
+  if (showArchived && showOnlyAlerts) {
+    state.ui.showOnlyAlertsPartsInWarehouse = false;
+  }
+
+  return {
+    showArchived: state.ui.showArchivedPartsInWarehouse === true,
+    showOnlyAlerts: state.ui.showOnlyAlertsPartsInWarehouse === true
+  };
+}
+
 function initWarehouseArchiveToggles() {
   const partsToggle = document.getElementById("showArchivedPartsToggle");
   const alertsToggle = document.getElementById("showOnlyAlertsPartsToggle");
   const machinesToggle = document.getElementById("showArchivedMachinesToggle");
 
+  const toggleState = normalizeWarehousePartsToggleMode();
+
   if (partsToggle) {
     if (typeof syncWarehouseToggleButtonState === "function") {
-      syncWarehouseToggleButtonState(partsToggle, shouldShowArchivedPartsInWarehouse());
+      syncWarehouseToggleButtonState(partsToggle, toggleState.showArchived);
     }
     partsToggle.addEventListener("click", () => {
-      setShowArchivedPartsInWarehouse(!shouldShowArchivedPartsInWarehouse());
+      const nextArchived = !shouldShowArchivedPartsInWarehouse();
+      setWarehousePartsToggleMode(nextArchived ? 'archived' : 'default');
+      if (typeof save === 'function') save();
       if (typeof resetTablePage === 'function') resetTablePage('warehouse_parts');
       renderWarehouse();
     });
@@ -508,10 +541,12 @@ function initWarehouseArchiveToggles() {
 
   if (alertsToggle) {
     if (typeof syncWarehouseToggleButtonState === "function") {
-      syncWarehouseToggleButtonState(alertsToggle, shouldShowOnlyAlertsPartsInWarehouse());
+      syncWarehouseToggleButtonState(alertsToggle, toggleState.showOnlyAlerts);
     }
     alertsToggle.addEventListener("click", () => {
-      setShowOnlyAlertsPartsInWarehouse(!shouldShowOnlyAlertsPartsInWarehouse());
+      const nextAlerts = !shouldShowOnlyAlertsPartsInWarehouse();
+      setWarehousePartsToggleMode(nextAlerts ? 'alerts' : 'default');
+      if (typeof save === 'function') save();
       if (typeof resetTablePage === 'function') resetTablePage('warehouse_parts');
       renderWarehouse();
     });

@@ -247,12 +247,23 @@ function computePartsSummary(options = {}) {
   return Array.from(summary.values());
 }
 
+function isWarehousePartEligibleForAlerts(sku) {
+  return !isPartArchived(sku);
+}
+
+function getWarehousePartAlertStatusMeta(sku, qty) {
+  if (!isWarehousePartEligibleForAlerts(sku)) {
+    return { level: "success", label: "OK" };
+  }
+  return getPartStockStatus(sku, qty);
+}
+
 function renderSideMissingTop5() {
   const els = getEls();
   if (!els.sideMissingSignals) return;
 
-  const rows = computePartsSummary({ includeArchived: shouldShowArchivedPartsInWarehouse() })
-    .map(r => ({ ...r, statusMeta: getPartStockStatus(r.sku, r.qty) }))
+  const rows = computePartsSummary({ includeArchived: false })
+    .map(r => ({ ...r, statusMeta: getWarehousePartAlertStatusMeta(r.sku, r.qty) }))
     .filter(r => r.statusMeta.level === "warning" || r.statusMeta.level === "danger")
     .sort((a, b) => {
       const levelOrder = { danger: 0, warning: 1, success: 2 };
@@ -269,7 +280,7 @@ function renderSideMissingTop5() {
   }
 
   els.sideMissingSignals.innerHTML = rows.map(r => {
-    const statusMeta = r.statusMeta || getPartStockStatus(r.sku, r.qty);
+    const statusMeta = r.statusMeta || getWarehousePartAlertStatusMeta(r.sku, r.qty);
     const cls = statusMeta.level;
     const status = statusMeta.label;
 
@@ -603,8 +614,14 @@ function renderWarehouse() {
   const showOnlyAlertsToggle = document.getElementById("showOnlyAlertsPartsToggle");
   const isEditMode = !!state.ui?.stockEditMode;
   const pendingMap = state.ui?.pendingStockAdjustments || {};
-  const showArchived = shouldShowArchivedPartsInWarehouse();
-  const showOnlyAlerts = shouldShowOnlyAlertsPartsInWarehouse();
+  const normalizedToggleState = typeof normalizeWarehousePartsToggleMode === 'function'
+    ? normalizeWarehousePartsToggleMode()
+    : {
+        showArchived: shouldShowArchivedPartsInWarehouse(),
+        showOnlyAlerts: shouldShowOnlyAlertsPartsInWarehouse()
+      };
+  const showArchived = normalizedToggleState.showArchived;
+  const showOnlyAlerts = normalizedToggleState.showOnlyAlerts;
 
   syncWarehouseToggleButtonState(showArchivedToggle, showArchived);
   syncWarehouseToggleButtonState(showOnlyAlertsToggle, showOnlyAlerts);
@@ -641,7 +658,9 @@ function renderWarehouse() {
       : Number.isFinite(pending?.newQty)
         ? safeQtyInt(pending.newQty)
         : item.qty;
-    const statusMeta = getPartStockStatus(item.sku, effectiveQty);
+    if (!isWarehousePartEligibleForAlerts(item.sku)) return false;
+
+    const statusMeta = getWarehousePartAlertStatusMeta(item.sku, effectiveQty);
     return statusMeta.level === "warning" || statusMeta.level === "danger";
   });
   let grandTotal = 0;
@@ -695,7 +714,7 @@ function renderWarehouse() {
       const diff = isInvalid ? null : Number.isFinite(pending?.diff) ? pending.diff : 0;
       const effectiveQty = isInvalid ? item.qty : Number.isFinite(pending?.newQty) ? safeQtyInt(pending.newQty) : item.qty;
       const isArchived = isPartArchived(item.sku);
-      const statusMeta = getPartStockStatus(item.sku, effectiveQty);
+      const statusMeta = getWarehousePartAlertStatusMeta(item.sku, effectiveQty);
       const rowClass = [
         !isArchived && statusMeta.level === "danger" ? "stock-row-danger" : !isArchived && statusMeta.level === "warning" ? "stock-row-warning" : "",
         pending && !isInvalid && diff !== 0 ? "stock-edit-row-changed" : "",

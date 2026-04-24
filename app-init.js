@@ -3001,6 +3001,39 @@ window.removeDeliveryItem = (id) => {
   renderDelivery();
 };
 
+function formatBuildMissingPartsMessage(missing = []) {
+  const rows = Array.isArray(missing) ? missing : [];
+  if (!rows.length) return 'Brakuje części do produkcji.';
+
+  const formatPartLabel = (item) => {
+    const sku = normalize(item?.sku || '—');
+    const name = normalize(item?.name || '');
+    if (name && sku && name !== sku) return `${name} (${sku})`;
+    return name || sku || '—';
+  };
+
+  if (rows.length === 1) {
+    const item = rows[0];
+    return `Brakuje części do produkcji: ${formatPartLabel(item)} — wymagane: ${safeQtyInt(item?.needed)}, dostępne: ${safeQtyInt(item?.has)}, brakuje: ${safeQtyInt(item?.missing)}.`;
+  }
+
+  return `Brakuje części do produkcji: ${rows.map(item => (
+    `${formatPartLabel(item)} — wymagane: ${safeQtyInt(item?.needed)}, dostępne: ${safeQtyInt(item?.has)}, brakuje: ${safeQtyInt(item?.missing)}`
+  )).join('; ')}.`;
+}
+
+function showBuildMissingStockFeedback(missing = []) {
+  const rows = Array.isArray(missing) ? missing : [];
+  if (!rows.length) return false;
+
+  if (typeof renderMissingParts === 'function') {
+    renderMissingParts(rows);
+  }
+
+  toast('Braki magazynowe', formatBuildMissingPartsMessage(rows), 'error', { duration: 7000 });
+  return true;
+}
+
 // Build events
 document.getElementById("addBuildItemBtn")?.addEventListener("click", () => {
   const btn = document.getElementById("addBuildItemBtn");
@@ -3091,6 +3124,8 @@ document.getElementById("finalizeBuildBtn")?.addEventListener("click", async () 
 
       if (!error) await finalizeBuild(manualAlloc);
     } else {
+      const missing = checkStockAvailability(calculateBuildRequirements());
+      if (showBuildMissingStockFeedback(missing)) return;
       await finalizeBuild(null);
     }
   } catch (e) {

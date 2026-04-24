@@ -740,6 +740,11 @@ tr:last-child td {
   border-bottom: none;
 }
 
+.operation-table-wrap tbody tr:last-child td,
+.users-admin-table-scroll tbody tr:last-child td {
+  border-bottom: 1px solid var(--border);
+}
+
 tbody tr {
   transition: background var(--trans-fast);
 }

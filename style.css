@@ -2045,11 +2045,9 @@ body.history-preview-open {
   text-overflow: ellipsis;
 }
 
-.signal-code {
+.signal-code.badge {
+  flex: 0 1 auto;
   max-width: 118px;
-  color: var(--text);
-  font-size: var(--text-sm);
-  font-weight: var(--font-semibold);
 }
 
 .signal-name {

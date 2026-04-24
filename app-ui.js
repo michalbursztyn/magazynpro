@@ -288,7 +288,7 @@ function renderSideMissingTop5() {
       <button class="signal-row" type="button" data-sku="${escapeHtml(String(r.sku))}" 
               aria-label="Przejdź do części ${escapeHtml(String(r.sku))}">
         <div class="signal-info">
-          <span class="signal-code" title="${escapeHtml(String(r.sku))}">${escapeHtml(String(r.sku))}</span>
+          <span class="badge signal-code" title="${escapeHtml(String(r.sku))}">${escapeHtml(String(r.sku))}</span>
           <span class="signal-name" title="${escapeHtml(String(r.name))}">${escapeHtml(String(r.name))}</span>
         </div>
         <div class="signal-meta">

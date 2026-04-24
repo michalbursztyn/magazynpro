@@ -41,8 +41,11 @@
           <div class="cardHeader">
             <h2>Magazyn Części</h2>
             <div class="toolbar warehouse-header-actions" style="margin:0">
-              <button type="button" class="btn btn-secondary btn-sm warehouse-filter-toggle" id="showArchivedPartsToggle" aria-pressed="true">Pokaż zarchiwizowane</button>
-              <button type="button" class="btn btn-secondary btn-sm warehouse-filter-toggle" id="showOnlyAlertsPartsToggle" aria-pressed="false">Pokaż tylko alerty</button>
+              <div class="segmented warehouse-view-switch warehouse-view-switch-parts" role="tablist" aria-label="Tryb widoku magazynu części">
+                <button type="button" id="showAllPartsToggle" role="tab" aria-selected="true">Wszystkie</button>
+                <button type="button" id="showArchivedPartsToggle" role="tab" aria-selected="false">Pokaż zarchiwizowane</button>
+                <button type="button" id="showOnlyAlertsPartsToggle" role="tab" aria-selected="false">Tylko alerty</button>
+              </div>
               <div class="inline-action-popover-anchor thresholds-popover-anchor" id="thresholdsPopoverAnchor">
                 <button type="button" class="btn btn-secondary btn-sm" id="toggleThresholdsBtn" aria-expanded="false" aria-controls="thresholdsPanel">Progi</button>
                 <div class="inline-action-popover thresholds-popover collapsible collapsed" id="thresholdsPanel" role="dialog" aria-label="Progi globalne" aria-hidden="true">
@@ -176,7 +179,13 @@
 
       <section class="tabPanel hidden" data-tab-panel="machines">
         <div class="card main-section-card-height">
-          <div class="cardHeader"><div><h2>Magazyn Wyrobów Gotowych</h2></div><button type="button" class="btn btn-secondary btn-sm warehouse-filter-toggle" id="showArchivedMachinesToggle" aria-pressed="true">Pokaż zarchiwizowane</button></div>
+          <div class="cardHeader warehouse-machines-header">
+            <div><h2>Magazyn Wyrobów Gotowych</h2></div>
+            <div class="segmented warehouse-view-switch warehouse-view-switch-machines" role="tablist" aria-label="Tryb widoku magazynu maszyn">
+              <button type="button" id="showAllMachinesToggle" role="tab" aria-selected="true">Wszystkie</button>
+              <button type="button" id="showArchivedMachinesToggle" role="tab" aria-selected="false">Pokaż zarchiwizowane</button>
+            </div>
+          </div>
           <div class="toolbar"><input type="text" id="searchMachines" placeholder="Szukaj..." autocomplete="off" /></div>
           <div class="table-container">
             <table id="machinesStockTable"><thead><tr><th>Nazwa Maszyny (ID)</th><th>Typ</th><th class="text-right">Stan</th><th>Status</th></tr></thead><tbody></tbody></table>

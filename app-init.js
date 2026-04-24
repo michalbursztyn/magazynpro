@@ -520,48 +520,40 @@ function normalizeWarehousePartsToggleMode() {
 }
 
 function initWarehouseArchiveToggles() {
-  const partsToggle = document.getElementById("showArchivedPartsToggle");
-  const alertsToggle = document.getElementById("showOnlyAlertsPartsToggle");
-  const machinesToggle = document.getElementById("showArchivedMachinesToggle");
+  const allPartsToggle = document.getElementById("showAllPartsToggle");
+  const archivedPartsToggle = document.getElementById("showArchivedPartsToggle");
+  const alertsPartsToggle = document.getElementById("showOnlyAlertsPartsToggle");
+  const allMachinesToggle = document.getElementById("showAllMachinesToggle");
+  const archivedMachinesToggle = document.getElementById("showArchivedMachinesToggle");
+
+  const applyPartsMode = (mode = "default") => {
+    setWarehousePartsToggleMode(mode);
+    if (typeof save === "function") save();
+    if (typeof resetTablePage === "function") resetTablePage("warehouse_parts");
+    renderWarehouse();
+  };
+
+  const applyMachinesMode = (mode = "default") => {
+    const nextMode = mode === "archived" ? "archived" : "default";
+    setShowArchivedMachinesInStock(nextMode === "archived");
+    if (typeof resetTablePage === "function") resetTablePage("warehouse_machines");
+    renderMachinesStock();
+  };
 
   const toggleState = normalizeWarehousePartsToggleMode();
-
-  if (partsToggle) {
-    if (typeof syncWarehouseToggleButtonState === "function") {
-      syncWarehouseToggleButtonState(partsToggle, toggleState.showArchived);
-    }
-    partsToggle.addEventListener("click", () => {
-      const nextArchived = !shouldShowArchivedPartsInWarehouse();
-      setWarehousePartsToggleMode(nextArchived ? 'archived' : 'default');
-      if (typeof save === 'function') save();
-      if (typeof resetTablePage === 'function') resetTablePage('warehouse_parts');
-      renderWarehouse();
-    });
+  if (typeof syncWarehousePartsViewSwitch === "function") {
+    syncWarehousePartsViewSwitch(toggleState.showArchived, toggleState.showOnlyAlerts);
+  }
+  if (typeof syncWarehouseMachinesViewSwitch === "function") {
+    syncWarehouseMachinesViewSwitch(shouldShowArchivedMachinesInStock());
   }
 
-  if (alertsToggle) {
-    if (typeof syncWarehouseToggleButtonState === "function") {
-      syncWarehouseToggleButtonState(alertsToggle, toggleState.showOnlyAlerts);
-    }
-    alertsToggle.addEventListener("click", () => {
-      const nextAlerts = !shouldShowOnlyAlertsPartsInWarehouse();
-      setWarehousePartsToggleMode(nextAlerts ? 'alerts' : 'default');
-      if (typeof save === 'function') save();
-      if (typeof resetTablePage === 'function') resetTablePage('warehouse_parts');
-      renderWarehouse();
-    });
-  }
+  allPartsToggle?.addEventListener("click", () => applyPartsMode("default"));
+  archivedPartsToggle?.addEventListener("click", () => applyPartsMode("archived"));
+  alertsPartsToggle?.addEventListener("click", () => applyPartsMode("alerts"));
 
-  if (machinesToggle) {
-    if (typeof syncWarehouseToggleButtonState === "function") {
-      syncWarehouseToggleButtonState(machinesToggle, shouldShowArchivedMachinesInStock());
-    }
-    machinesToggle.addEventListener("click", () => {
-      setShowArchivedMachinesInStock(!shouldShowArchivedMachinesInStock());
-      if (typeof resetTablePage === 'function') resetTablePage('warehouse_machines');
-      renderMachinesStock();
-    });
-  }
+  allMachinesToggle?.addEventListener("click", () => applyMachinesMode("default"));
+  archivedMachinesToggle?.addEventListener("click", () => applyMachinesMode("archived"));
 }
 
 let partEditorIsNew = true;

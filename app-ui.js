@@ -495,8 +495,32 @@ function closePartDetailsModal() {
 
 function syncWarehouseToggleButtonState(button, isActive) {
   if (!button) return;
-  button.classList.toggle("is-active", !!isActive);
-  button.setAttribute("aria-pressed", isActive ? "true" : "false");
+  const active = !!isActive;
+  button.classList.toggle("active", active);
+  button.classList.toggle("is-active", active);
+  button.setAttribute("aria-selected", active ? "true" : "false");
+  button.setAttribute("aria-pressed", active ? "true" : "false");
+}
+
+function syncWarehousePartsViewSwitch(showArchived, showOnlyAlerts) {
+  const allToggle = document.getElementById("showAllPartsToggle");
+  const archivedToggle = document.getElementById("showArchivedPartsToggle");
+  const alertsToggle = document.getElementById("showOnlyAlertsPartsToggle");
+  const isArchived = !!showArchived;
+  const isAlerts = !!showOnlyAlerts;
+
+  syncWarehouseToggleButtonState(allToggle, !isArchived && !isAlerts);
+  syncWarehouseToggleButtonState(archivedToggle, isArchived);
+  syncWarehouseToggleButtonState(alertsToggle, isAlerts);
+}
+
+function syncWarehouseMachinesViewSwitch(showArchived) {
+  const allToggle = document.getElementById("showAllMachinesToggle");
+  const archivedToggle = document.getElementById("showArchivedMachinesToggle");
+  const isArchived = !!showArchived;
+
+  syncWarehouseToggleButtonState(allToggle, !isArchived);
+  syncWarehouseToggleButtonState(archivedToggle, isArchived);
 }
 
 function openBatchPreviewByPrice(sku, price) {
@@ -652,8 +676,12 @@ function renderWarehouse() {
   const showArchived = normalizedToggleState.showArchived;
   const showOnlyAlerts = normalizedToggleState.showOnlyAlerts;
 
-  syncWarehouseToggleButtonState(showArchivedToggle, showArchived);
-  syncWarehouseToggleButtonState(showOnlyAlertsToggle, showOnlyAlerts);
+  if (typeof syncWarehousePartsViewSwitch === "function") {
+    syncWarehousePartsViewSwitch(showArchived, showOnlyAlerts);
+  } else {
+    syncWarehouseToggleButtonState(showArchivedToggle, showArchived);
+    syncWarehouseToggleButtonState(showOnlyAlertsToggle, showOnlyAlerts);
+  }
   if (thresholdsBtn) {
     thresholdsBtn.classList.toggle("hidden", !canThresholdsManage);
     thresholdsBtn.setAttribute('aria-hidden', canThresholdsManage ? 'false' : 'true');
@@ -1047,7 +1075,11 @@ function renderMachinesStock() {
   const showArchivedToggle = document.getElementById("showArchivedMachinesToggle");
   const showArchived = shouldShowArchivedMachinesInStock();
 
-  syncWarehouseToggleButtonState(showArchivedToggle, showArchived);
+  if (typeof syncWarehouseMachinesViewSwitch === "function") {
+    syncWarehouseMachinesViewSwitch(showArchived);
+  } else {
+    syncWarehouseToggleButtonState(showArchivedToggle, showArchived);
+  }
 
   const tbody = document.querySelector("#machinesStockTable tbody");
   if (!tbody) return;

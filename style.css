@@ -5106,3 +5106,42 @@ body.account-settings-open {
 .permissions-readonly button {
   cursor: not-allowed;
 }
+
+/* ---------- Warehouse View Segmented Controls ---------- */
+.warehouse-view-switch {
+  flex: 0 0 auto;
+  align-items: center;
+  min-width: 0;
+}
+
+.warehouse-view-switch button {
+  min-height: 30px;
+  white-space: nowrap;
+}
+
+.warehouse-view-switch button[aria-selected="true"] {
+  color: var(--text);
+  background: var(--surface-4);
+  box-shadow: var(--shadow-xs);
+}
+
+.warehouse-machines-header {
+  align-items: center;
+}
+
+@media (max-width: 900px) {
+  .warehouse-header-actions,
+  .warehouse-machines-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .warehouse-view-switch {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .warehouse-view-switch button {
+    flex: 1 0 auto;
+  }
+}

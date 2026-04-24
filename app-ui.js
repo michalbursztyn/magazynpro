@@ -300,6 +300,33 @@ function renderSideMissingTop5() {
   }).join("");
 }
 
+function getHistoryActionMeta(evOrType) {
+  const rawType = typeof evOrType === "string" ? evOrType : evOrType?.type;
+  const type = rawType === "delivery" || rawType === "build" || rawType === "adjustment" ? rawType : "adjustment";
+
+  const meta = {
+    delivery: {
+      label: "Dostawa",
+      icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v10H3z"></path><path d="M14 10h4l3 3v4h-7z"></path><circle cx="7" cy="18" r="2"></circle><circle cx="18" cy="18" r="2"></circle></svg>'
+    },
+    build: {
+      label: "Produkcja",
+      icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l9 5-9 5-9-5 9-5z"></path><path d="M3 12l9 5 9-5"></path><path d="M3 17l9 5 9-5"></path></svg>'
+    },
+    adjustment: {
+      label: "Korekta",
+      icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h11"></path><path d="M12 4l3 3-3 3"></path><path d="M20 17H9"></path><path d="M12 14l-3 3 3 3"></path></svg>'
+    }
+  };
+
+  return { type, ...meta[type] };
+}
+
+function renderHistoryActionBadge(evOrType) {
+  const meta = getHistoryActionMeta(evOrType);
+  return `<span class="history-action-badge" data-history-action-type="${escapeHtml(meta.type)}">${meta.icon}<span>${escapeHtml(meta.label)}</span></span>`;
+}
+
 function renderSideRecentActions5() {
   const els = getEls();
   if (!els.sideRecentActions) return;
@@ -315,8 +342,7 @@ function renderSideRecentActions5() {
   }
 
   els.sideRecentActions.innerHTML = rows.map(ev => {
-    const typeLabel = ev.type === "delivery" ? "Dostawa" : ev.type === "build" ? "Produkcja" : "Korekta";
-    const pillClass = ev.type === "delivery" ? "success" : ev.type === "build" ? "accent" : "warning";
+    const typeLabel = getHistoryActionMeta(ev).label;
 
     return `
       <li>
@@ -327,7 +353,7 @@ function renderSideRecentActions5() {
           data-hid="${escapeHtml(String(ev.id))}"
           aria-label="Otwórz podgląd akcji ${escapeHtml(typeLabel)} z dnia ${escapeHtml(String(fmtDateISO(ev.dateISO) || '—'))}">
           <div class="signal-info signal-info-history signal-info-history-compact">
-            <span class="badge badge-${pillClass}">${typeLabel}</span>
+            ${renderHistoryActionBadge(ev)}
             <span class="signal-history-date">${fmtDateISO(ev.dateISO)}</span>
           </div>
         </button>
@@ -1223,8 +1249,9 @@ function renderHistory() {
       const n = (ev.items || []).length;
       const total = (ev.items || []).reduce((s, i) => s + (safeFloat(i.price) * safeInt(i.qty)), 0);
       summary = `
-        <div style="display:flex;gap:var(--space-2);align-items:center;flex-wrap:wrap">
-          <span class="badge badge-success">${escapeHtml(ev.supplier || "—")}</span>
+        <div class="history-action-summary">
+          ${renderHistoryActionBadge(ev)}
+          <span class="history-action-detail">Dostawca: <strong>${escapeHtml(ev.supplier || "—")}</strong></span>
           <span class="text-muted" style="font-size:var(--text-sm)">Pozycji: <strong>${n}</strong></span>
           <span class="text-muted" style="font-size:var(--text-sm)">Suma: <strong>${fmtPLN.format(total)}</strong></span>
         </div>
@@ -1247,8 +1274,9 @@ function renderHistory() {
       const more = (ev.items || []).length > 2 ? ` +${(ev.items || []).length - 2}` : "";
 
       summary = `
-        <div style="display:flex;gap:var(--space-2);align-items:center;flex-wrap:wrap">
-          <span class="badge badge-accent">${escapeHtml(machinesPreview || "Produkcja")}${escapeHtml(more)}</span>
+        <div class="history-action-summary">
+          ${renderHistoryActionBadge(ev)}
+          <span class="history-action-detail">Maszyny: <strong>${escapeHtml(machinesPreview || "—")}${escapeHtml(more)}</strong></span>
           <span class="text-muted" style="font-size:var(--text-sm)">Pozycji: <strong>${n}</strong></span>
           <span class="text-muted" style="font-size:var(--text-sm)">Sztuk: <strong>${totalQty}</strong></span>
           ${Number.isFinite(totalConsumptionValue) && totalConsumptionValue > 0
@@ -1263,8 +1291,8 @@ function renderHistory() {
       const n = safeQtyInt(ev.partsChanged ?? adjustmentItems.length);
       const netDiff = adjustmentItems.reduce((sum, i) => sum + Number(i?.diff || 0), 0);
       summary = `
-        <div style="display:flex;gap:var(--space-2);align-items:center;flex-wrap:wrap">
-          <span class="badge badge-warning">Korekta stanów</span>
+        <div class="history-action-summary">
+          ${renderHistoryActionBadge(ev)}
           <span class="text-muted" style="font-size:var(--text-sm)">Części: <strong>${n}</strong></span>
           <span class="text-muted" style="font-size:var(--text-sm)">Bilans: <strong>${netDiff > 0 ? `+${netDiff}` : netDiff}</strong></span>
         </div>
@@ -1348,8 +1376,6 @@ function buildHistoryDetails(ev) {
   const isDelivery = ev.type === "delivery";
   const isBuild = ev.type === "build";
   const isAdjustment = ev.type === "adjustment";
-  const typeLabel = isDelivery ? "Dostawa" : isBuild ? "Produkcja" : "Korekta";
-  const badgeClass = isDelivery ? "badge-success" : isBuild ? "badge-accent" : "badge-warning";
   const items = Array.isArray(ev.items)
     ? ev.items
     : (Array.isArray(ev?.details?.changes) ? ev.details.changes : []);
@@ -1430,7 +1456,7 @@ function buildHistoryDetails(ev) {
     return `
       <div class="history-modal-head">
         <div>
-          <div class="history-modal-kicker"><span class="badge ${badgeClass}">${typeLabel}</span><span>${fmtDateISO(ev.dateISO)}</span></div>
+          <div class="history-modal-kicker">${renderHistoryActionBadge(ev)}<span>${fmtDateISO(ev.dateISO)}</span></div>
           <h3 class="history-modal-title">Podgląd korekty stanów</h3>
           <p class="history-modal-subtitle">Zbiorcza sesja korekt z czytelnym rozpisaniem stanu przed, po i sposobu rozliczenia.</p>
           <p class="history-modal-subtitle">Wykonał: ${authorLabel}</p>
@@ -1472,7 +1498,7 @@ function buildHistoryDetails(ev) {
     return `
       <div class="history-modal-head">
         <div>
-          <div class="history-modal-kicker"><span class="badge ${badgeClass}">${typeLabel}</span><span>${fmtDateISO(ev.dateISO)}</span></div>
+          <div class="history-modal-kicker">${renderHistoryActionBadge(ev)}<span>${fmtDateISO(ev.dateISO)}</span></div>
           <h3 class="history-modal-title">Podgląd dostawy</h3>
           <p class="history-modal-subtitle">Szczegóły przyjęcia od dostawcy i pełne zestawienie pozycji.</p>
           <p class="history-modal-subtitle">Wykonał: ${authorLabel}</p>
@@ -1623,7 +1649,7 @@ function buildHistoryDetails(ev) {
   return `
     <div class="history-modal-head">
       <div>
-        <div class="history-modal-kicker"><span class="badge ${badgeClass}">${typeLabel}</span><span>${fmtDateISO(ev.dateISO)}</span></div>
+        <div class="history-modal-kicker">${renderHistoryActionBadge(ev)}<span>${fmtDateISO(ev.dateISO)}</span></div>
         <h3 class="history-modal-title">Podgląd produkcji</h3>
         <p class="history-modal-subtitle">Rozpiska maszyn i realnie zużytych partii magazynowych.</p>
         <p class="history-modal-subtitle">Wykonał: ${authorLabel}</p>

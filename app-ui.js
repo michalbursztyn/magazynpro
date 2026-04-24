@@ -747,10 +747,7 @@ function renderWarehouse() {
         return item && item.invalid !== true && safeQtyInt(item.newQty) !== safeQtyInt(item.previousQty);
       }).length;
       stockEditBanner.innerHTML = `
-        <div>
-          <strong>Tryb korekty stanów aktywny</strong>
-          <div class="history-adjustment-note">Wpisujesz stan docelowy dla części. Zmiany zapiszą się dopiero po zbiorczym zatwierdzeniu.</div>
-        </div>
+        <strong>Tryb korekty stanów aktywny</strong>
         <div class="badge badge-accent">Zmodyfikowane: ${changedCount}</div>
       `;
     } else {

@@ -323,15 +323,23 @@ function initSidePanelSignals() {
 }
 
 function initStockEditMode() {
+  const stockEditSaveBtn = document.getElementById("stockEditSaveBtn");
+  const stockEditCancelBtn = document.getElementById("stockEditCancelBtn");
+
+  stockEditSaveBtn?.classList.remove("btn-secondary", "btn-success", "btn-danger");
+  stockEditSaveBtn?.classList.add("btn-primary");
+  stockEditCancelBtn?.classList.remove("btn-secondary", "btn-primary", "btn-success");
+  stockEditCancelBtn?.classList.add("btn-danger");
+
   document.getElementById("stockEditToggleBtn")?.addEventListener("click", () => {
     beginStockEditMode();
   });
 
-  document.getElementById("stockEditCancelBtn")?.addEventListener("click", () => {
+  stockEditCancelBtn?.addEventListener("click", () => {
     cancelStockEditMode();
   });
 
-  document.getElementById("stockEditSaveBtn")?.addEventListener("click", async () => {
+  stockEditSaveBtn?.addEventListener("click", async () => {
     try {
       await commitStockAdjustments();
     } catch (err) {

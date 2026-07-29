@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validation:
+    name: Syntax and regression tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check browser JavaScript syntax
+        run: |
+          node --check app-core.js
+          node --check app-ui.js
+          node --check app-supabase.js
+          node --check app-init.js
+
+      - name: Check Edge Function syntax
+        run: node --experimental-strip-types --check supabase/functions/create-company-worker/index.ts
+
+      - name: Run regression tests
+        run: node --test tests/regression.test.js

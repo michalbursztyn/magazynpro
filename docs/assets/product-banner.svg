@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title description">
+  <title id="title">Magazyn PRO — warehouse and production management</title>
+  <desc id="description">Secure warehouse operations, production and access control</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0d1015"/>
+      <stop offset="0.58" stop-color="#111827"/>
+      <stop offset="1" stop-color="#0c2030"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#9bbcff"/>
+      <stop offset="1" stop-color="#5f87dd"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#7aa2f7" stop-opacity=".28"/>
+      <stop offset="1" stop-color="#7aa2f7" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="20" stdDeviation="28" flood-color="#000" flood-opacity=".42"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="630" rx="28" fill="url(#background)"/>
+  <circle cx="1000" cy="80" r="330" fill="url(#glow)"/>
+  <circle cx="150" cy="650" r="390" fill="url(#glow)" opacity=".45"/>
+
+  <g opacity=".12" stroke="#9bbcff">
+    <path d="M0 112H1200M0 224H1200M0 336H1200M0 448H1200M0 560H1200"/>
+    <path d="M112 0V630M224 0V630M336 0V630M448 0V630M560 0V630M672 0V630M784 0V630M896 0V630M1008 0V630M1120 0V630"/>
+  </g>
+
+  <g transform="translate(82 82)">
+    <rect width="76" height="76" rx="18" fill="#17324d" stroke="#7aa2f7" stroke-opacity=".5"/>
+    <path d="M17 57V19h10l11 19 11-19h10v38H49V36L38 54 27 36v21z" fill="#fff"/>
+  </g>
+
+  <text x="82" y="228" fill="#e7ecf3" font-family="Segoe UI, Arial, sans-serif" font-size="72" font-weight="700" letter-spacing="-2">
+    Magazyn <tspan fill="url(#accent)">PRO</tspan>
+  </text>
+  <text x="86" y="282" fill="#b8c3d4" font-family="Segoe UI, Arial, sans-serif" font-size="23">
+    Secure inventory, production and access control
+  </text>
+
+  <g transform="translate(82 350)" font-family="Segoe UI, Arial, sans-serif">
+    <g>
+      <rect width="174" height="50" rx="25" fill="#141923" stroke="#7aa2f7" stroke-opacity=".35"/>
+      <circle cx="27" cy="25" r="6" fill="#10b981"/>
+      <text x="45" y="32" fill="#dce5f2" font-size="18">Multi-tenant</text>
+    </g>
+    <g transform="translate(190)">
+      <rect width="188" height="50" rx="25" fill="#141923" stroke="#7aa2f7" stroke-opacity=".35"/>
+      <circle cx="27" cy="25" r="6" fill="#7aa2f7"/>
+      <text x="45" y="32" fill="#dce5f2" font-size="18">Transactional</text>
+    </g>
+    <g transform="translate(394)">
+      <rect width="150" height="50" rx="25" fill="#141923" stroke="#7aa2f7" stroke-opacity=".35"/>
+      <circle cx="27" cy="25" r="6" fill="#f59e0b"/>
+      <text x="45" y="32" fill="#dce5f2" font-size="18">FIFO lots</text>
+    </g>
+  </g>
+
+  <g transform="translate(710 130)" filter="url(#shadow)">
+    <rect width="410" height="370" rx="22" fill="#141923" stroke="#7aa2f7" stroke-opacity=".32"/>
+    <rect x="25" y="24" width="360" height="54" rx="12" fill="#10151d"/>
+    <circle cx="53" cy="51" r="8" fill="#10b981"/>
+    <text x="73" y="58" fill="#e7ecf3" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="600">Operational overview</text>
+
+    <g transform="translate(25 101)" font-family="Segoe UI, Arial, sans-serif">
+      <rect width="108" height="104" rx="14" fill="#10151d"/>
+      <text x="16" y="28" fill="#97a3b5" font-size="13">PARTS</text>
+      <text x="16" y="68" fill="#e7ecf3" font-size="27" font-weight="700">LOTS</text>
+      <rect x="16" y="82" width="62" height="5" rx="2.5" fill="#10b981"/>
+
+      <g transform="translate(126)">
+        <rect width="108" height="104" rx="14" fill="#10151d"/>
+        <text x="16" y="28" fill="#97a3b5" font-size="13">ALERTS</text>
+        <text x="16" y="68" fill="#e7ecf3" font-size="27" font-weight="700">RULES</text>
+        <rect x="16" y="82" width="45" height="5" rx="2.5" fill="#f59e0b"/>
+      </g>
+
+      <g transform="translate(252)">
+        <rect width="108" height="104" rx="14" fill="#10151d"/>
+        <text x="16" y="28" fill="#97a3b5" font-size="13">MACHINES</text>
+        <text x="16" y="68" fill="#e7ecf3" font-size="27" font-weight="700">BOM</text>
+        <rect x="16" y="82" width="72" height="5" rx="2.5" fill="#7aa2f7"/>
+      </g>
+    </g>
+
+    <g transform="translate(25 229)">
+      <rect width="360" height="116" rx="14" fill="#10151d"/>
+      <text x="18" y="28" fill="#97a3b5" font-family="Segoe UI, Arial, sans-serif" font-size="13">RECENT STOCK FLOW</text>
+      <path d="M20 87C55 88 68 49 102 59S150 95 186 66 237 42 270 57 318 71 340 39" fill="none" stroke="#7aa2f7" stroke-width="4" stroke-linecap="round"/>
+      <path d="M20 98H340" stroke="#263347"/>
+      <circle cx="340" cy="39" r="6" fill="#10b981"/>
+    </g>
+  </g>
+
+  <text x="84" y="555" fill="#748196" font-family="Cascadia Mono, Consolas, monospace" font-size="17">
+    Vanilla JavaScript · Supabase · PostgreSQL RLS · Edge Functions
+  </text>
+</svg>

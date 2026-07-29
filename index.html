@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta
+    http-equiv="Content-Security-Policy"
+    content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://vprzhxqgotxrmrjslzll.supabase.co wss://vprzhxqgotxrmrjslzll.supabase.co; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
+  />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <title>Magazyn PRO</title>
+  <meta name="description" content="System zarządzania magazynem i produkcją" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="auth-shell" id="authShell" aria-hidden="false">
+    <div class="auth-card">
+      <div class="auth-card-head">
+        <h2>Logowanie do Magazyn PRO</h2>
+        <p>Zaloguj się kontem firmowym, żeby wejść do systemu.</p>
+      </div>
+      <form id="authLoginForm" class="auth-form" autocomplete="on">
+        <label>Adres e-mail<input type="email" id="authEmailInput" placeholder="twoj@firma.pl" autocomplete="email" required /></label>
+        <label>Hasło<input type="password" id="authPasswordInput" placeholder="••••••••" autocomplete="current-password" required /></label>
+        <button type="submit" class="btn btn-primary" id="authLoginBtn">Zaloguj</button>
+      </form>
+      <div class="auth-error hidden" id="authErrorBox" role="alert" aria-live="assertive"></div>
+    </div>
+  </div>
+
+  <main class="appShell hidden" id="appShell">
+    <div class="appMain">
+      <header class="app-header">
+        <div class="app-header-main">
+          <h1>Magazyn <span class="logo-accent">PRO</span></h1>
+        </div>
+      </header>
+
+      <section class="tabPanel widePanel" data-tab-panel="parts">
+        <div class="card main-section-card-height">
+          <div class="cardHeader">
+            <h2>Magazyn Części</h2>
+            <div class="toolbar warehouse-header-actions" style="margin:0">
+              <div class="segmented warehouse-view-switch warehouse-view-switch-parts" role="tablist" aria-label="Tryb widoku magazynu części">
+                <button type="button" id="showAllPartsToggle" role="tab" aria-selected="true">Wszystkie</button>
+                <button type="button" id="showArchivedPartsToggle" role="tab" aria-selected="false">Pokaż zarchiwizowane</button>
+                <button type="button" id="showOnlyAlertsPartsToggle" role="tab" aria-selected="false">Tylko alerty</button>
+              </div>
+              <div class="inline-action-popover-anchor thresholds-popover-anchor" id="thresholdsPopoverAnchor">
+                <button type="button" class="btn btn-secondary btn-sm" id="toggleThresholdsBtn" aria-expanded="false" aria-controls="thresholdsPanel">Progi</button>
+                <div class="inline-action-popover thresholds-popover collapsible collapsed" id="thresholdsPanel" role="dialog" aria-label="Progi globalne" aria-hidden="true">
+                  <div class="inline-action-popover-card thresholds-popover-card">
+                    <div class="thresholds-popover-head">
+                      <div>
+                        <h3>Progi globalne</h3>
+                        <p>Szybkie ustawienia alertów dla całej firmy.</p>
+                      </div>
+                    </div>
+                    <div class="inline-action-popover-body thresholds-popover-body">
+                      <label class="threshold-control threshold-control-warning">
+                        <span class="threshold-control-top">
+                          <span class="threshold-control-title">Ostrzeżenie</span>
+                          <strong><span id="warnValue">100</span> szt.</strong>
+                        </span>
+                        <input type="range" id="warnRange" min="0" max="1000" step="10" value="100" />
+                      </label>
+                      <label class="threshold-control threshold-control-danger">
+                        <span class="threshold-control-top">
+                          <span class="threshold-control-title">Krytyczny</span>
+                          <strong><span id="dangerValue">50</span> szt.</strong>
+                        </span>
+                        <input type="range" id="dangerRange" min="0" max="1000" step="10" value="50" />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <button type="button" class="btn btn-secondary btn-sm" id="stockEditToggleBtn">Edycja stanów</button>
+              <div class="warehouse-edit-actions hidden" id="stockEditActions">
+                <button type="button" class="btn btn-success btn-sm" id="stockEditSaveBtn">Zatwierdź korekty</button>
+                <button type="button" class="btn btn-secondary btn-sm" id="stockEditCancelBtn">Anuluj</button>
+              </div>
+            </div>
+          </div>
+          <div class="toolbar">
+            <input type="text" id="searchParts" placeholder="Szukaj po Nazwie/Typie..." autocomplete="off" />
+          </div>
+          <div class="warehouse-edit-banner hidden" id="stockEditBanner" aria-live="polite"></div>
+          <div class="table-container">
+            <table class="table-sticky" id="skuSummaryTable">
+              <thead>
+                <tr><th>Nazwa (ID)</th><th>Typ</th><th class="text-right">Stan</th><th class="text-right">Wartość</th><th>Status</th><th class="text-right">Akcje</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="tabPanel hidden operation-tab operation-tab-delivery" data-tab-panel="delivery">
+        <div class="card operation-card main-section-card-height">
+          <div class="cardHeader operation-card-header"><div><h2>Przyjęcie Dostawy</h2></div></div>
+          <div class="operation-shell">
+            <div class="operation-grid">
+              <div class="operation-main">
+                <div class="form-row operation-form-row operation-form-row-top">
+                  <label>Dostawca<select id="supplierSelect"></select></label>
+                  <label>Data przyjęcia<input type="date" id="deliveryDate" required /></label>
+                </div>
+                <div class="form-row operation-form-row">
+                  <label>Numer faktury<input type="text" id="deliveryInvoiceNumber" autocomplete="off" required /></label>
+                </div>
+                <div class="form-row operation-form-row"><label>Wybierz część<select id="supplierPartsSelect"></select></label></div>
+                <div class="form-row form-row-3 operation-form-row operation-inline-actions">
+                  <label>Ilość<input type="number" id="deliveryQty" min="1" step="1" value="1" /></label>
+                  <label>Cena jedn.<input type="number" id="deliveryPrice" min="0" step="0.01" value="0" /></label>
+                  <div class="operation-action-slot"><button type="button" class="btn btn-secondary operation-add-btn" id="addDeliveryItemBtn">Dodaj</button></div>
+                </div>
+              </div>
+              <div class="operation-side">
+                <div class="operation-side-body operation-side-body-delivery">
+                  <div class="table-container operation-table-wrap operation-side-scroll">
+                    <table id="deliveryItemsTable">
+                      <thead><tr><th>Nazwa (ID)</th><th class="text-right">Ilość</th><th class="text-right">Cena</th><th class="text-right">Razem</th><th></th></tr></thead>
+                      <tbody></tbody>
+                    </table>
+                  </div>
+                </div>
+                <div class="delivery-actions operation-summary-panel">
+                  <div class="delivery-summary operation-summary-grid">
+                    <div><span class="text-secondary">Pozycji:</span><strong id="itemsCount">0</strong></div>
+                    <div><span class="text-secondary">Do zapłaty:</span><strong id="itemsTotal">0,00 zł</strong></div>
+                  </div>
+                  <button type="button" class="btn btn-primary operation-cta" id="finalizeDeliveryBtn" disabled>Zatwierdź</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="tabPanel hidden operation-tab operation-tab-build" data-tab-panel="build">
+        <div class="card operation-card main-section-card-height">
+          <div class="cardHeader operation-card-header"><div><h2>Zlecenie Produkcyjne</h2></div></div>
+          <div class="operation-shell">
+            <div class="operation-grid operation-grid-build">
+              <div class="operation-main">
+                <div class="form-row operation-form-row"><label>Wybierz maszynę<select id="machineSelect"></select></label></div>
+                <div class="form-row form-row-3 operation-form-row operation-inline-actions">
+                  <label>Ilość sztuk<input type="number" id="buildQty" min="1" step="1" value="1" /></label>
+                  <label>Data<input type="date" id="buildDate" /></label>
+                  <div class="operation-action-slot"><button type="button" class="btn btn-secondary operation-add-btn" id="addBuildItemBtn">Dodaj</button></div>
+                </div>
+                <hr class="operation-divider" />
+                <div class="form-row operation-form-row"><label>Tryb<select id="consumeMode"><option value="fifo" selected>Automatyczny (FIFO)</option><option value="manual">Ręczny wybór partii</option></select></label></div>
+                <div class="alert alert-danger hidden operation-alert" id="missingBox">
+                  <div><strong>Braki magazynowe!</strong><p style="margin-top:var(--space-2);margin-bottom:0">Brakuje części:</p><ul id="missingList" style="margin-top:var(--space-2);margin-bottom:0;padding-left:var(--space-5)"></ul></div>
+                </div>
+              </div>
+              <div class="operation-side">
+                <div class="operation-side-body operation-side-body-build">
+                  <div class="table-container operation-table-wrap operation-side-scroll">
+                    <table id="buildItemsTable"><thead><tr><th>Maszyna</th><th class="text-right">Ilość</th><th></th></tr></thead><tbody></tbody></table>
+                  </div>
+                  <div class="editor-panel hidden operation-manual-box operation-side-scroll" id="manualConsumeBox">
+                    <div class="editor-header operation-manual-header" style="margin-bottom:var(--space-3);padding-bottom:var(--space-2)"><h4 style="margin:0;font-size:var(--text-base)">Wybór partii (Manual)</h4></div>
+                    <div class="consume-grid" id="manualConsumeUI"></div>
+                  </div>
+                </div>
+                <div class="delivery-actions operation-summary-panel">
+                  <div class="delivery-summary operation-summary-grid"><span class="text-secondary">Maszyn:</span><strong id="buildItemsCount">0</strong></div>
+                  <button type="button" class="btn btn-primary operation-cta" id="finalizeBuildBtn" disabled>Finalizuj</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="tabPanel hidden" data-tab-panel="machines">
+        <div class="card main-section-card-height">
+          <div class="cardHeader warehouse-machines-header">
+            <div><h2>Magazyn Wyrobów Gotowych</h2></div>
+            <div class="segmented warehouse-view-switch warehouse-view-switch-machines" role="tablist" aria-label="Tryb widoku magazynu maszyn">
+              <button type="button" id="showAllMachinesToggle" role="tab" aria-selected="true">Wszystkie</button>
+              <button type="button" id="showArchivedMachinesToggle" role="tab" aria-selected="false">Pokaż zarchiwizowane</button>
+            </div>
+          </div>
+          <div class="toolbar"><input type="text" id="searchMachines" placeholder="Szukaj..." autocomplete="off" /></div>
+          <div class="table-container">
+            <table id="machinesStockTable"><thead><tr><th>Nazwa Maszyny (ID)</th><th>Typ</th><th class="text-right">Stan</th><th>Status</th></tr></thead><tbody></tbody></table>
+          </div>
+        </div>
+      </section>
+
+      <section class="tabPanel hidden" data-tab-panel="catalog_parts">
+        <div class="card main-section-card-height">
+          <div class="cardHeader"><div><h2>Baza Części</h2></div><button type="button" class="btn btn-primary btn-sm" id="toggleNewPartBtn">Nowa</button></div>
+          <div class="toolbar"><input type="text" id="searchCatalogParts" placeholder="Szukaj po Nazwie/Typie..." autocomplete="off" /></div>
+          <div class="table-container">
+            <table id="partsCatalogTable"><thead><tr><th>Nazwa (ID)</th><th>Typ</th><th>Dostawcy</th><th>Status</th><th class="text-right">Akcje</th></tr></thead><tbody></tbody></table>
+          </div>
+        </div>
+      </section>
+
+      <section class="tabPanel hidden" data-tab-panel="catalog_suppliers">
+        <div class="card main-section-card-height">
+          <div class="cardHeader supplier-catalog-header">
+            <div>
+              <h2>Dostawcy i Cenniki</h2>
+            </div>
+            <div class="inline-action-popover-anchor supplier-add-popover-anchor" id="supplierAddPopoverAnchor">
+              <button type="button" class="btn btn-primary btn-sm supplier-add-trigger" id="toggleSupplierPopoverBtn" aria-expanded="false" aria-controls="supplierAddPopoverPanel">Nowy dostawca</button>
+              <div class="inline-action-popover supplier-add-popover collapsible collapsed" id="supplierAddPopoverPanel" role="dialog" aria-label="Nowy dostawca" aria-hidden="true">
+                <div class="inline-action-popover-card supplier-add-popover-card">
+                  <div class="inline-action-popover-body supplier-add-row">
+                    <input type="text" id="supplierNameInput" class="supplier-add-input" autocomplete="off" />
+                    <button type="button" class="btn btn-primary btn-sm supplier-add-btn" id="addSupplierBtn">Dodaj</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="toolbar"><input type="text" id="searchCatalogSuppliers" placeholder="Szukaj po nazwie dostawcy..." autocomplete="off" /></div>
+            <div class="table-container">
+              <table id="suppliersListTable"><thead><tr><th>Dostawca</th><th>Status</th><th class="text-right">Akcje</th></tr></thead><tbody></tbody></table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="tabPanel hidden" data-tab-panel="catalog_machines">
+        <div class="card main-section-card-height">
+          <div class="cardHeader"><div><h2>Baza Maszyn (BOM)</h2></div><button type="button" class="btn btn-primary btn-sm" id="openMachineModalBtn">Nowa</button></div>
+          <div class="toolbar"><input type="text" id="searchCatalogMachines" placeholder="Szukaj po Nazwie/Typie..." autocomplete="off" /></div>
+          <div class="table-container">
+            <table id="machinesCatalogTable"><thead><tr><th>Nazwa (ID)</th><th>Typ</th><th class="text-right">Części</th><th>Status</th><th class="text-right">Akcje</th></tr></thead><tbody id="machinesCatalogBody"></tbody></table>
+          </div>
+        </div>
+      </section>
+
+
+      <section class="tabPanel hidden" data-tab-panel="users">
+        <div class="card users-admin-card main-section-card-height">
+          <div class="cardHeader users-admin-card-header">
+            <div>
+              <h2>Użytkownicy firmy</h2>
+            </div>
+            <div class="users-admin-header-actions">
+              <button type="button" class="btn btn-primary btn-sm" id="openCreateUserModalBtn">Dodaj użytkownika</button>
+            </div>
+          </div>
+
+          <div class="users-admin-grid">
+            <div class="users-admin-block users-admin-block-list">
+              <div class="editor-header users-admin-block-header" style="margin-bottom:var(--space-3)">
+                <div>
+                  <h4 class="editor-title">Lista użytkowników</h4>
+                                  </div>
+                <button type="button" class="btn btn-secondary btn-sm" id="refreshUsersBtn">Odśwież</button>
+              </div>
+              <div class="table-container users-admin-table-scroll">
+                <table id="companyUsersTable">
+                  <thead>
+                    <tr>
+                      <th>Imię i nazwisko</th>
+                      <th>Rola</th>
+                      <th class="text-right">Akcje</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="users-admin-block users-admin-block-role-panel" id="rolePermissionsBlock">
+              <div class="editor-header users-admin-block-header users-admin-role-header" style="margin-bottom:var(--space-3)">
+                <div>
+                  <h4 class="editor-title">Konfiguracja ról</h4>
+                                  </div>
+                <div class="users-admin-actions users-admin-actions-tight">
+                  <button type="button" class="btn btn-secondary btn-sm" id="rolePermissionsResetBtn">Przywróć</button>
+                  <button type="button" class="btn btn-primary btn-sm" id="rolePermissionsSaveBtn">Zapisz konfigurację</button>
+                </div>
+              </div>
+
+              <div class="segmented role-permissions-role-switch" id="rolePermissionsRoleSwitch" role="tablist" aria-label="Edytowana rola">
+                <button type="button" class="active" data-role-permissions-role="owner" role="tab" aria-selected="true">owner</button>
+                <button type="button" data-role-permissions-role="admin" role="tab" aria-selected="false">admin</button>
+                <button type="button" data-role-permissions-role="worker" role="tab" aria-selected="false">worker</button>
+              </div>
+
+              <div class="users-admin-readonly-note hidden" id="rolePermissionsReadOnlyNote">
+                Tylko owner może zmieniać konfigurację ról i tworzyć użytkowników. Ty możesz tu co najwyżej popatrzeć, co też jest jakąś formą aktywności.
+              </div>
+
+              <div class="role-permissions-editor" id="rolePermissionsEditor"></div>
+            </div>
+          </div>
+
+          <div class="user-create-backdrop hidden" id="createUserBackdrop" aria-hidden="true">
+              <div class="user-create-shell">
+                <div class="user-create-panel" id="createUserPanel" role="dialog" aria-modal="true" aria-labelledby="createUserModalTitle">
+                  <button type="button" class="user-create-close" id="createUserCloseBtn" aria-label="Zamknij">×</button>
+                  <div class="user-create-head">
+                    <div>
+                      <h3 class="user-create-title" id="createUserModalTitle">Dodaj użytkownika</h3>
+                    </div>
+                  </div>
+                  <form id="createUserForm">
+                  <div class="form-row users-create-form-row" style="margin-bottom:var(--space-3)">
+                    <label>Imię i nazwisko
+                      <input type="text" id="createWorkerFullNameInput" placeholder="Jan Kowalski" autocomplete="name" />
+                    </label>
+                  </div>
+                  <div class="form-row form-row-2 users-create-form-row users-create-form-row-credentials" style="margin-bottom:var(--space-3)">
+                    <label>Adres e-mail
+                      <input type="email" id="createWorkerEmailInput" placeholder="pracownik@firma.pl" autocomplete="email" />
+                    </label>
+                    <label>Hasło startowe
+                      <input type="password" id="createWorkerPasswordInput" placeholder="Minimum 6 znaków" minlength="6" autocomplete="new-password" />
+                    </label>
+                  </div>
+                  <div class="form-row" style="margin-bottom:0">
+                    <label>Rola
+                      <select id="createWorkerRoleSelect">
+                        <option value="worker" selected>worker</option>
+                        <option value="admin">admin</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div class="user-create-actions">
+                    <button type="button" class="btn btn-secondary" id="createUserCancelBtn">Anuluj</button>
+                    <button type="button" class="btn btn-primary" id="createWorkerBtn">Utwórz użytkownika</button>
+                  </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+
+            <div class="user-info-backdrop hidden" id="userInfoBackdrop" aria-hidden="true">
+              <div class="user-info-shell">
+                <div class="user-info-panel" id="userInfoPanel" role="dialog" aria-modal="true" aria-labelledby="userInfoTitle">
+                  <button type="button" class="user-info-close" id="userInfoCloseBtn" aria-label="Zamknij">×</button>
+                  <div class="user-info-head">
+                    <div>
+                      <div class="user-info-kicker">
+                        <span class="badge badge-accent">Informacje</span>
+                        <span id="userInfoModalRoleHint">Użytkownik firmy</span>
+                      </div>
+                      <h3 class="user-info-title" id="userInfoTitle">Użytkownik</h3>
+                      <p class="user-info-subtitle" id="userInfoSubtitle">Szczegóły konta i akcje administracyjne.</p>
+                    </div>
+                  </div>
+
+                  <div class="user-info-summary-grid" id="userInfoSummaryGrid"></div>
+
+                  <div class="users-admin-readonly-note hidden" id="userInfoReadonlyNote"></div>
+
+                  <div class="user-info-form-grid">
+                    <label>Rola
+                      <select id="userInfoRoleSelect">
+                        <option value="worker">worker</option>
+                        <option value="admin">admin</option>
+                      </select>
+                    </label>
+                    <label>Status aktywności
+                      <input type="text" id="userInfoStatusInput" readonly />
+                    </label>
+                  </div>
+
+                  <div class="user-info-actions">
+                    <button type="button" class="btn btn-secondary" id="userInfoHistoryBtn" data-action="openUserHistory">Historia</button>
+                    <button type="button" class="btn btn-secondary" id="userInfoRoleSaveBtn" data-action="saveUserRole">Zapisz rolę</button>
+                    <button type="button" class="btn btn-secondary" id="userInfoToggleActiveBtn" data-action="toggleUserActive">Zmień status</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+        </div>
+      </section>
+
+      <section class="tabPanel hidden" data-tab-panel="history">
+        <div class="card main-section-card-height">
+          <div class="cardHeader history-card-header">
+            <div>
+              <h2>Ostatnie akcje</h2>
+            </div>
+            <div class="segmented history-view-switch" role="tablist" aria-label="Widok historii">
+              <button type="button" id="historyViewAllBtn" role="tab" aria-selected="false">Wszystkie</button>
+              <button type="button" id="historyViewDeliveriesBtn" class="active" role="tab" aria-selected="true">Dostawy</button>
+              <button type="button" id="historyViewBuildsBtn" role="tab" aria-selected="false">Produkcje</button>
+              <button type="button" id="historyViewAdjustmentsBtn" role="tab" aria-selected="false">Korekty</button>
+            </div>
+          </div>
+          <div class="toolbar history-toolbar">
+            <input type="text" id="historySearch" placeholder="Szukaj..." autocomplete="off" />
+            <input type="text" id="historyDateRange" placeholder="01.01.2026-02.01.2026" inputmode="numeric" autocomplete="off" style="max-width:200px" />
+            <select id="historyAuthorFilter" aria-label="Filtruj po autorze">
+              <option value="">Wszyscy autorzy</option>
+            </select>
+          </div>
+          <div class="table-container">
+            <table class="table-sticky" id="historyTable"><thead><tr><th>Data</th><th>Autor</th><th>Szczegóły</th><th class="text-right">Podgląd</th></tr></thead><tbody></tbody></table>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <aside class="globalSide" aria-label="Panel boczny">
+      <div class="card stickySide">
+        <div class="side-panel-topbar">
+          <div class="side-auth-summary" aria-live="polite">
+            <span class="side-auth-kicker" id="authPanelStatusText">—</span>
+            <strong class="side-auth-company" id="authPanelCompanyName">—</strong>
+          </div>
+          <button type="button" class="side-auth-settings-btn" id="accountSettingsBtn" aria-label="Ustawienia konta" title="Ustawienia konta">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 .99-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 .99 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51.99H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51.99z"></path>
+            </svg>
+          </button>
+        </div>
+        <div class="side-section" style="padding-top:0">
+          <h3 class="side-title">Nawigacja</h3>
+          <nav class="tabs-nav" aria-label="Nawigacja główna">
+            <div class="tabs-nav-priority" aria-label="Główne akcje">
+              <button type="button" class="tab-btn tab-btn-priority" data-tab-target="delivery"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Dostawa</button>
+              <button type="button" class="tab-btn tab-btn-priority" data-tab-target="build"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>Produkcja</button>
+            </div>
+            <button type="button" class="tab-btn active" data-tab-target="parts"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>Magazyn Części</button>
+            <button type="button" class="tab-btn" data-tab-target="machines"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>Magazyn Maszyn</button>
+            <button type="button" class="tab-btn" data-tab-target="users"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Użytkownicy</button>
+            <button type="button" class="tab-btn" data-tab-target="history"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Ostatnie akcje</button>
+            <button type="button" class="tab-btn" data-tab-target="catalog_suppliers"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Dostawcy</button>
+            <button type="button" class="tab-btn" data-tab-target="catalog_parts"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Baza Części</button>
+            <button type="button" class="tab-btn" data-tab-target="catalog_machines"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/></svg>Baza maszyn</button>
+          </nav>
+        </div>
+        <div class="side-section side-section-warehouse">
+          <div class="side-section-head side-section-head-warehouse">
+            <h3 class="side-title">Magazyn</h3>
+            <div class="side-warehouse-total" aria-label="Łączna wartość magazynu">
+              <span class="side-warehouse-total-label">Łączna wartość</span>
+              <span class="side-warehouse-total-value" id="sideWarehouseTotal">0,00 zł</span>
+            </div>
+          </div>
+          <div id="sideMissingSignals"></div>
+        </div>
+        <div class="side-section">
+          <h3 class="side-title">Ostatnie akcje</h3>
+          <ul id="sideRecentActions" style="list-style:none;padding:0;margin:0;display:grid;gap:var(--space-2)"></ul>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <div class="account-settings-backdrop hidden" id="accountSettingsBackdrop" aria-hidden="true">
+    <div class="account-settings-shell">
+      <button type="button" class="account-settings-close" id="accountSettingsCloseBtn" aria-label="Zamknij">×</button>
+
+      <div class="account-settings-panel hidden" id="accountSettingsPanel" role="dialog" aria-modal="true" aria-labelledby="accountSettingsTitle">
+        <div class="account-settings-head">
+          <div class="account-settings-kicker">
+            <span class="badge badge-accent">Konto użytkownika</span>
+          </div>
+          <h3 class="account-settings-title" id="accountSettingsTitle">Ustawienia konta</h3>
+        </div>
+
+        <div class="account-settings-section">
+          <div class="account-settings-stats account-settings-stats-3">
+            <div class="account-settings-info-card">
+              <span class="account-settings-info-label">E-mail</span>
+              <strong class="account-settings-info-value account-value-break" id="accountEmailDisplay">—</strong>
+            </div>
+            <div class="account-settings-info-card">
+              <span class="account-settings-info-label">Firma</span>
+              <strong class="account-settings-info-value account-value-break" id="accountCompanyDisplay">—</strong>
+            </div>
+            <div class="account-settings-info-card">
+              <span class="account-settings-info-label">Rola</span>
+              <strong class="account-settings-info-value" id="accountRoleDisplay">—</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="account-settings-section">
+          <div class="account-settings-section-head">
+            <h4>Zmień hasło</h4>
+          </div>
+
+          <form class="account-settings-form" id="accountPasswordForm">
+            <div class="form-row form-row-2 account-settings-password-grid">
+              <label>
+                Nowe hasło
+                <input
+                  type="password"
+                  id="accountNewPasswordInput"
+                  placeholder="Minimum 6 znaków"
+                  minlength="6"
+                  autocomplete="new-password"
+                />
+              </label>
+
+              <label>
+                Powtórz hasło
+                <input
+                  type="password"
+                  id="accountRepeatPasswordInput"
+                  placeholder="Powtórz hasło"
+                  autocomplete="new-password"
+                />
+              </label>
+            </div>
+
+            <div class="auth-error hidden" id="accountPasswordErrorBox" role="alert" aria-live="assertive"></div>
+
+            <div class="account-settings-actions">
+              <button type="button" class="btn btn-secondary" id="accountSavePasswordBtn">Zapisz nowe hasło</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="account-settings-footer">
+          <button type="button" class="btn btn-secondary" id="authLogoutBtn">Wyloguj</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-modal-backdrop hidden" id="tabModalBackdrop" aria-hidden="true">
+    <div class="tab-modal-shell"><button type="button" class="tab-modal-close" id="tabModalCloseBtn" aria-label="Zamknij">×</button></div>
+  </div>
+
+  <div class="part-editor-backdrop hidden" id="partEditorBackdrop" aria-hidden="true">
+    <div class="part-editor-shell" role="dialog" aria-modal="true" aria-labelledby="partEditorModalTitle">
+      <button type="button" class="part-editor-close" id="partEditorCloseBtn" aria-label="Zamknij">×</button>
+      <div class="editor-panel part-editor-panel hidden" id="partEditorTemplate">
+        <div class="editor-header part-editor-header">
+          <div><h4 class="editor-title" id="partEditorModalTitle">Nowa część</h4><span class="editor-hint" id="partEditorModalHint">Dodaj część do bazy.</span></div>
+        </div>
+        <div class="part-editor-grid">
+          <div class="part-editor-form">
+            <div class="form-row form-row-2" style="margin-bottom:0">
+              <label>Nazwa (ID)<input type="text" id="partSkuInput" placeholder="np. SR-M6-30" autocomplete="off" /></label>
+              <label>Typ<input type="text" id="partNameInput" placeholder="np. Śruba M6x30" autocomplete="off" /></label>
+            </div>
+            <div class="form-row form-row-2 part-threshold-row" style="margin-bottom:0">
+              <label>Próg żółty<input type="number" id="partYellowThresholdInput" min="0" step="1" inputmode="numeric" placeholder="domyślny" autocomplete="off" /></label>
+              <label>Próg czerwony<input type="number" id="partRedThresholdInput" min="0" step="1" inputmode="numeric" placeholder="domyślny" autocomplete="off" /></label>
+            </div>
+            <p class="part-threshold-hint">Żółty = ostrzeżenie, czerwony = krytyczny. Puste pola = progi domyślne.</p>
+          </div>
+          <div class="part-editor-suppliers">
+            <div class="editor-header part-editor-subheader"><div><h5 class="editor-title">Dostawcy</h5><span class="editor-hint">Przypisz część do dostawców.</span></div></div>
+            <div style="margin-bottom:var(--space-4)">
+              <div class="combobox" id="partNewSuppliersChecklist" data-combo="suppliers"><span class="text-muted" style="font-size:var(--text-sm)">Brak dostawców.</span></div>
+              <div class="combobox hidden" id="editPartSuppliersChecklist" data-combo="suppliers" aria-hidden="true"></div>
+            </div>
+            <div class="hidden part-editor-prices" id="newPartSupplierPrices">
+              <div class="part-editor-prices-head"><span class="text-secondary" style="font-size:var(--text-sm)">Ceny dla dostawców</span><span class="text-secondary" style="font-size:var(--text-sm)">PLN / szt.</span></div>
+              <div id="newPartSupplierPricesBody"></div>
+            </div>
+            <div class="hidden part-editor-prices" id="editPartSupplierPrices">
+              <div class="part-editor-prices-head"><span class="text-secondary" style="font-size:var(--text-sm)">Ceny dla dostawców</span><span class="text-secondary" style="font-size:var(--text-sm)">PLN / szt.</span></div>
+              <div id="editPartSupplierPricesBody"></div>
+            </div>
+          </div>
+        </div>
+        <div class="part-editor-actions">
+          <button type="button" class="btn btn-success" id="addPartBtn">Utwórz</button>
+          <button type="button" class="btn btn-success hidden" id="saveEditPartBtn">Zapisz</button>
+          <button type="button" class="btn btn-secondary" id="cancelNewPartBtn">Anuluj</button>
+          <button type="button" class="btn btn-secondary hidden" id="cancelEditPartBtn">Anuluj</button>
+        </div>
+        <input type="hidden" id="editPartSkuInput" />
+        <input type="hidden" id="partEditTitle" value="Edycja Części" />
+      </div>
+    </div>
+  </div>
+
+  <div class="supplier-editor-backdrop hidden" id="supplierEditorBackdrop" aria-hidden="true">
+    <div class="supplier-editor-shell" role="dialog" aria-modal="true" aria-labelledby="supplierEditorTitle">
+      <button type="button" class="supplier-editor-close" id="supplierEditorCloseBtn" aria-label="Zamknij">×</button>
+      <div class="editor-panel supplier-editor-panel hidden" id="supplierEditorTemplate">
+        <div class="editor-header supplier-editor-header"><div><h4 class="editor-title" id="supplierEditorTitle">Edycja cennika: <span id="supplierEditorName" class="accent">—</span></h4><span class="editor-hint">Ustaw ceny części.</span></div></div>
+        <div class="supplier-editor-grid">
+          <div class="supplier-editor-form">
+            <div class="form-row supplier-editor-form-row">
+              <label>Wybierz część<select id="supplierEditorPartSelect"></select></label>
+              <label style="max-width:140px">Cena<input type="number" id="supplierEditorPriceInput" min="0" step="0.01" value="0" /></label>
+              <button type="button" class="btn btn-secondary" id="supplierEditorSetPriceBtn">Ustaw</button>
+            </div>
+          </div>
+          <div class="supplier-editor-prices">
+            <div class="table-container">
+              <table><thead><tr><th>Nazwa (ID)</th><th>Typ</th><th class="text-right">Cena PLN</th></tr></thead><tbody id="supplierEditorPriceBody"></tbody></table>
+            </div>
+          </div>
+        </div>
+        <div class="supplier-editor-actions">
+          <button type="button" class="btn btn-success" id="supplierEditorSaveBtn">Zapisz</button>
+          <button type="button" class="btn btn-secondary" id="supplierEditorCancelBtn">Anuluj</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="machine-editor-backdrop hidden" id="machineEditorBackdrop" aria-hidden="true">
+    <div class="machine-editor-shell" role="dialog" aria-modal="true" aria-labelledby="machineEditorTitle">
+      <button type="button" class="machine-editor-close" id="machineEditorCloseBtn" aria-label="Zamknij">×</button>
+      <div class="editor-panel machine-editor-panel hidden" id="machineEditorTemplate">
+        <div class="editor-header machine-editor-header">
+          <div><h4 class="editor-title" id="machineEditorTitle">Nowa maszyna</h4><span class="editor-hint" id="machineEditorHint">Zbuduj BOM.</span></div>
+          <div class="machine-editor-title-meta"><span id="machineEditorName" class="accent">—</span><span class="badge" id="machineEditorCode">NOWA</span></div>
+        </div>
+        <div class="machine-editor-grid">
+          <div class="machine-editor-meta">
+            <div class="form-row form-row-2 machine-editor-form-row">
+              <label>Nazwa (ID)<input type="text" id="machineCodeInput" placeholder="np. M-100" autocomplete="off" /></label>
+              <label>Typ<input type="text" id="machineNameInput" placeholder="np. Wiertarka" autocomplete="off" /></label>
+            </div>
+          </div>
+          <div class="machine-editor-bom">
+            <div class="editor-header machine-editor-subheader"><div><h5 class="editor-title">Skład</h5><span class="editor-hint">Dodaj części.</span></div></div>
+            <div class="form-row machine-editor-bom-row">
+              <label>Dodaj część<select id="bomSkuSelect"></select></label>
+              <label style="max-width:120px">Ilość<input type="number" id="bomQtyInput" min="1" step="1" value="1" /></label>
+              <button type="button" class="btn btn-secondary" id="addBomItemBtn">Dodaj</button>
+            </div>
+            <div class="table-container">
+              <table id="bomTable"><thead><tr><th>Część</th><th>Typ</th><th class="text-right">Ilość</th><th></th></tr></thead><tbody></tbody></table>
+            </div>
+          </div>
+        </div>
+        <div class="machine-editor-actions">
+          <button type="button" class="btn btn-success" id="machineEditorSaveBtn">Utwórz</button>
+          <button type="button" class="btn btn-secondary" id="machineEditorCancelBtn">Anuluj</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="part-details-backdrop hidden" id="partDetailsBackdrop" aria-hidden="true">
+    <div class="part-details-shell" role="dialog" aria-modal="true" aria-labelledby="partDetailsTitle">
+      <button type="button" class="part-details-close" id="partDetailsCloseBtn" aria-label="Zamknij">×</button>
+      <div class="part-details-panel hidden" id="partDetailsPanel">
+        <div class="part-details-header">
+          <div>
+            <div class="part-details-kicker"><span class="badge badge-accent">Szczegóły części</span></div>
+            <h3 class="part-details-title" id="partDetailsTitle">—</h3>
+            <p class="part-details-subtitle" id="partDetailsSubtitle">—</p>
+          </div>
+        </div>
+        <div class="part-details-stats" id="partDetailsStats"></div>
+        <div class="part-details-section">
+          <div class="part-details-section-head"><div><h4>Warianty cenowe</h4><p>Kliknij "Podgląd" aby zobaczyć partie od dostawców.</p></div></div>
+          <div class="table-container part-details-table-wrap">
+            <table class="part-details-table">
+              <thead><tr><th>Cena zak.</th><th class="text-right">Ilość</th><th class="text-right">Wartość</th><th class="text-right">Partie</th><th class="text-right">Akcje</th></tr></thead>
+              <tbody id="partDetailsPriceVariants"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="catalog-readonly-backdrop hidden" id="supplierCatalogDetailsBackdrop" aria-hidden="true">
+    <div class="catalog-readonly-shell" role="dialog" aria-modal="true" aria-labelledby="supplierCatalogDetailsTitle">
+      <button type="button" class="catalog-readonly-close" id="supplierCatalogDetailsCloseBtn" aria-label="Zamknij">×</button>
+      <div class="catalog-readonly-panel hidden" id="supplierCatalogDetailsPanel">
+        <div class="catalog-readonly-header">
+          <div>
+            <div class="catalog-readonly-kicker"><span class="badge badge-accent">Szczegóły dostawcy</span></div>
+            <h3 class="catalog-readonly-title" id="supplierCatalogDetailsTitle">—</h3>
+            <p class="catalog-readonly-subtitle" id="supplierCatalogDetailsSubtitle">—</p>
+          </div>
+        </div>
+        <div class="catalog-readonly-stats" id="supplierCatalogDetailsStats"></div>
+        <div id="supplierCatalogDetailsSections"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="catalog-readonly-backdrop hidden" id="catalogPartDetailsBackdrop" aria-hidden="true">
+    <div class="catalog-readonly-shell" role="dialog" aria-modal="true" aria-labelledby="catalogPartDetailsTitle">
+      <button type="button" class="catalog-readonly-close" id="catalogPartDetailsCloseBtn" aria-label="Zamknij">×</button>
+      <div class="catalog-readonly-panel hidden" id="catalogPartDetailsPanel">
+        <div class="catalog-readonly-header">
+          <div>
+            <div class="catalog-readonly-kicker"><span class="badge badge-accent">Szczegóły części z bazy</span></div>
+            <h3 class="catalog-readonly-title" id="catalogPartDetailsTitle">—</h3>
+            <p class="catalog-readonly-subtitle" id="catalogPartDetailsSubtitle">—</p>
+          </div>
+        </div>
+        <div class="catalog-readonly-stats" id="catalogPartDetailsStats"></div>
+        <div id="catalogPartDetailsSections"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="catalog-readonly-backdrop hidden" id="machineCatalogDetailsBackdrop" aria-hidden="true">
+    <div class="catalog-readonly-shell" role="dialog" aria-modal="true" aria-labelledby="machineCatalogDetailsTitle">
+      <button type="button" class="catalog-readonly-close" id="machineCatalogDetailsCloseBtn" aria-label="Zamknij">×</button>
+      <div class="catalog-readonly-panel hidden" id="machineCatalogDetailsPanel">
+        <div class="catalog-readonly-header">
+          <div>
+            <div class="catalog-readonly-kicker"><span class="badge badge-accent">Szczegóły maszyny</span></div>
+            <h3 class="catalog-readonly-title" id="machineCatalogDetailsTitle">—</h3>
+            <p class="catalog-readonly-subtitle" id="machineCatalogDetailsSubtitle">—</p>
+          </div>
+        </div>
+        <div class="catalog-readonly-stats" id="machineCatalogDetailsStats"></div>
+        <div id="machineCatalogDetailsSections"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="batch-preview-backdrop hidden" id="batchPreviewBackdrop" aria-hidden="true">
+    <div class="batch-preview-shell" role="dialog" aria-modal="true" aria-label="Podgląd partii">
+      <button type="button" class="batch-preview-close" id="batchPreviewCloseBtn" aria-label="Zamknij">×</button>
+      <div class="batch-preview-panel hidden" id="batchPreviewPanel">
+        <div id="batchPreviewContent"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="history-preview-backdrop hidden" id="historyPreviewBackdrop" aria-hidden="true">
+    <div class="history-preview-shell" role="dialog" aria-modal="true" aria-label="Szczegóły operacji">
+      <button type="button" class="history-preview-close" id="historyPreviewCloseBtn" aria-label="Zamknij">×</button>
+      <div class="history-preview-panel hidden" id="historyPreviewPanel">
+        <div id="historyPreviewContent"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="app-core.js"></script>
+  <script src="app-ui.js"></script>
+  <script src="app-supabase.js"></script>
+  <script src="app-init.js"></script>
+</body>
+</html>

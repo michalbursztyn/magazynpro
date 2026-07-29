@@ -1,0 +1,2 @@
+[functions.create-company-worker]
+verify_jwt = true

@@ -1,0 +1,31 @@
+# Sekrety i konfiguracja lokalna
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Lokalne pliki Supabase
+supabase/.temp/
+supabase/.branches/
+
+# Zależności i wyniki testów
+node_modules/
+coverage/
+test-results/
+
+# Zrzuty, kopie i logi
+*.dump
+*.backup
+*.bak
+*.old
+*.tmp
+*.log
+*~
+
+# System i edytory
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/

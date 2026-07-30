@@ -258,6 +258,21 @@ p {
     position: static;
     max-height: none;
   }
+
+  .globalSide .stickySide .side-panel-topbar {
+    margin-bottom: var(--space-2);
+  }
+
+  .globalSide .side-section-nav {
+    padding: 0;
+    border-bottom: 0;
+  }
+
+  .globalSide .side-section-warehouse,
+  .globalSide .side-section-recent {
+    display: none;
+  }
+
 }
 
 /* Grid layouts */
@@ -541,16 +556,16 @@ p {
 
 @media (max-width: 900px) {
   .warehouse-filter-toggle {
-    width: 100%;
+    width: auto;
     justify-content: center;
   }
 
   .thresholds-popover-anchor {
-    width: 100%;
+    width: auto;
   }
 
   .thresholds-popover-anchor > .btn {
-    width: 100%;
+    width: auto;
     justify-content: center;
   }
 }
@@ -558,6 +573,12 @@ p {
 @media (max-width: 640px) {
   .inline-action-popover-anchor {
     --inline-popover-width: min(360px, calc(100vw - 24px));
+  }
+
+  .warehouse-filter-toggle,
+  .thresholds-popover-anchor,
+  .thresholds-popover-anchor > .btn {
+    width: 100%;
   }
 }
 
@@ -1310,9 +1331,103 @@ tbody tr:nth-child(even):hover {
   flex: 0 0 auto;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 1200px) {
   .tabs-nav {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     width: 100%;
+    gap: var(--space-1);
+  }
+
+  .tabs-nav-priority {
+    display: contents;
+  }
+
+  .tab-btn,
+  .tab-btn-priority {
+    min-height: 42px;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--surface-1);
+  }
+
+  .warehouse-header-actions > .thresholds-popover-anchor .inline-action-popover {
+    left: auto;
+    right: 0;
+    transform: translateY(0);
+  }
+
+  .warehouse-header-actions > .thresholds-popover-anchor .inline-action-popover.collapsed {
+    transform: translateY(-6px);
+  }
+}
+
+@media (max-width: 900px) {
+  .tabs-nav {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .warehouse-header-actions > .thresholds-popover-anchor {
+    position: static;
+  }
+
+  .warehouse-header-actions > .thresholds-popover-anchor .inline-action-popover {
+    left: 0;
+    right: 0;
+    width: auto;
+    max-width: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .appShell {
+    gap: var(--space-4);
+    padding: var(--space-3);
+  }
+
+  .globalSide .stickySide .side-panel-topbar {
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .side-section-nav .side-title {
+    display: none;
+  }
+
+  .side-section-nav {
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .tabs-nav {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    gap: var(--space-1);
+    overflow-x: auto;
+    padding-bottom: var(--space-1);
+    scroll-snap-type: x proximity;
+    scrollbar-width: thin;
+  }
+
+  .tabs-nav-priority {
+    display: contents;
+  }
+
+  .tab-btn,
+  .tab-btn-priority {
+    flex: 0 0 auto;
+    width: auto;
+    min-height: 44px;
+    scroll-snap-align: start;
+    border: 1px solid var(--border);
+  }
+
+  .tab-btn::before {
+    display: none;
+  }
+
+  .tab-btn.active {
+    border-color: var(--border-strong);
   }
 }
 
@@ -3960,6 +4075,10 @@ body.part-details-open {
     max-width: none;
   }
 
+  .warehouse-search-edit-row #searchParts {
+    flex: 0 0 auto;
+  }
+
   .warehouse-edit-banner {
     flex-direction: row;
     align-items: center;
@@ -5298,13 +5417,15 @@ body.account-settings-open {
 }
 
 @media (max-width: 900px) {
-  .warehouse-header-actions,
-  .warehouse-machines-header {
+  .warehouse-header-actions {
+    width: 100%;
     align-items: stretch;
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: wrap;
   }
 
   .warehouse-view-switch {
+    flex: 1 1 100%;
     width: 100%;
     overflow-x: auto;
   }
@@ -5329,12 +5450,46 @@ body.account-settings-open {
 
 @media (max-width: 900px) {
   .cardHeader {
-    align-items: flex-start;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .cardHeader > :last-child {
+    min-width: 0;
+  }
+
+  .cardHeader > .toolbar,
+  .cardHeader > .segmented,
+  .cardHeader > .users-admin-header-actions,
+  .cardHeader > .users-admin-actions,
+  .cardHeader > .warehouse-edit-actions {
+    width: 100%;
+  }
+
+  .cardHeader > .btn {
+    align-self: flex-start;
   }
 
   .cardHeader .segmented,
   .cardHeader .inline-action-popover-anchor,
   .cardHeader .btn.btn-sm {
     width: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .card {
+    padding: var(--space-4);
+  }
+
+  .warehouse-header-actions > .thresholds-popover-anchor,
+  .warehouse-header-actions > #stockEditToggleBtn {
+    flex: 1 1 110px;
+    width: auto;
+  }
+
+  .warehouse-header-actions > .thresholds-popover-anchor > .btn,
+  .warehouse-header-actions > #stockEditToggleBtn {
+    width: 100%;
   }
 }

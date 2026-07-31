@@ -1879,7 +1879,7 @@ function buildHistoryDetails(ev) {
           <table class="history-modal-table table-dense">
             <thead>
               <tr>
-                <th>Nazwa (ID)</th>
+                <th>Część</th>
                 <th class="text-right">Ilość</th>
                 <th class="text-right">Cena</th>
                 <th class="text-right">Razem</th>
@@ -1956,7 +1956,7 @@ function buildHistoryDetails(ev) {
         <table class="history-modal-table history-modal-table-dense table-dense">
           <thead>
             <tr>
-              <th>Nazwa (ID)</th>
+              <th>Część</th>
               <th>Dostawca</th>
               <th>Data</th>
               <th class="text-right">Cena zak.</th>
@@ -2345,7 +2345,7 @@ function openCatalogPartDetailsModal(skuRaw) {
     <section class="catalog-readonly-section">
       <div class="catalog-readonly-section-head"><div><h4>Podstawowe</h4><p>Krótkie podsumowanie części i jej stanu.</p></div></div>
       <div class="catalog-readonly-grid">
-        ${renderCatalogDetailsRow('Nazwa / typ', `<strong>${escapeHtml(data.name || '—')}</strong>`)}
+        ${renderCatalogDetailsRow('Nazwa części', `<strong>${escapeHtml(data.name || '—')}</strong>`)}
         ${renderCatalogDetailsRow('Liczba przypisanych dostawców', String(data.suppliersCount))}
         ${renderCatalogDetailsRow('Cena referencyjna', escapeHtml(data.referencePrice > 0 ? fmtPLN.format(data.referencePrice) : 'brak danych'))}
         ${renderCatalogDetailsRow('Aktualny stan magazynowy', String(data.stockQty))}
@@ -2353,7 +2353,7 @@ function openCatalogPartDetailsModal(skuRaw) {
       </div>
     </section>
     <section class="catalog-readonly-section">
-      <div class="catalog-readonly-section-head"><div><h4>Wykorzystanie</h4><p>Powiązania z BOM-ami maszyn.</p></div></div>
+      <div class="catalog-readonly-section-head"><div><h4>Wykorzystanie</h4><p>Powiązania ze składami materiałowymi maszyn.</p></div></div>
       <div class="catalog-readonly-grid">
         ${renderCatalogDetailsRow('W ilu maszynach jest używana', String(data.machineCount))}
         ${renderCatalogDetailsRow('Lista maszyn, w których występuje', renderCatalogDetailsList(machineLabels, 'Brak powiązanych maszyn'))}
@@ -2406,7 +2406,7 @@ function openMachineCatalogDetailsModal(machineCodeRaw) {
   subtitleEl.textContent = data.name || 'Podgląd informacji i statystyk maszyny.';
 
   statsEl.innerHTML = [
-    renderCatalogDetailsStat('Pozycje BOM', String(data.bomCount)),
+    renderCatalogDetailsStat('Pozycje składu', String(data.bomCount)),
     renderCatalogDetailsStat('Łączne sztuki na 1 budowę', String(data.totalBomQty)),
     renderCatalogDetailsStat('Wyprodukowano', String(data.totalProducedQty)),
     renderCatalogDetailsStat('Maks. do zbudowania', String(data.maxBuildableUnits))
@@ -2416,8 +2416,8 @@ function openMachineCatalogDetailsModal(machineCodeRaw) {
     <section class="catalog-readonly-section">
       <div class="catalog-readonly-section-head"><div><h4>Podstawowe</h4><p>Kondensat najważniejszych informacji o definicji maszyny.</p></div></div>
       <div class="catalog-readonly-grid">
-        ${renderCatalogDetailsRow('Nazwa / typ', `<strong>${escapeHtml(data.name || '—')}</strong>`)}
-        ${renderCatalogDetailsRow('Liczba pozycji BOM', String(data.bomCount))}
+        ${renderCatalogDetailsRow('Nazwa maszyny', `<strong>${escapeHtml(data.name || '—')}</strong>`)}
+        ${renderCatalogDetailsRow('Liczba pozycji składu', String(data.bomCount))}
         ${renderCatalogDetailsRow('Łączna liczba wszystkich sztuk części potrzebnych do 1 budowy', String(data.totalBomQty))}
       </div>
     </section>
@@ -2436,7 +2436,7 @@ function openMachineCatalogDetailsModal(machineCodeRaw) {
       </div>
     </section>
     <section class="catalog-readonly-section">
-      <div class="catalog-readonly-section-head"><div><h4>BOM / gotowość</h4><p>Realna gotowość ograniczona stanem magazynowym.</p></div></div>
+      <div class="catalog-readonly-section-head"><div><h4>Skład i gotowość</h4><p>Realna gotowość ograniczona stanem magazynowym.</p></div></div>
       <div class="catalog-readonly-grid">
         ${renderCatalogDetailsRow('Maksymalna liczba sztuk możliwych do zbudowania z obecnego magazynu', String(data.maxBuildableUnits))}
       </div>
@@ -2516,7 +2516,7 @@ function renderAllSuppliers() {
           <td class="text-right">
             <div class="catalog-actions">
               ${canEdit ? `<button class="btn btn-secondary btn-sm" type="button" data-action="openSupplierEditor" data-supplier="${escapeHtml(name)}">Edytuj</button>` : ``}
-              ${canEdit ? `<button class="btn btn-secondary btn-sm" type="button" data-action="toggleSupplierArchive" data-supplier="${escapeHtml(name)}">${isArchived ? 'Przywróć' : 'Archiwizuj'}</button>` : ``}
+              ${canEdit ? `<button class="btn ${isArchived ? 'btn-secondary' : 'btn-caution'} btn-sm" type="button" data-action="toggleSupplierArchive" data-supplier="${escapeHtml(name)}">${isArchived ? 'Przywróć' : 'Archiwizuj'}</button>` : ``}
               <button class="btn btn-secondary btn-sm" type="button" data-action="openSupplierCatalogDetails" data-supplier="${escapeHtml(name)}">Szczegóły</button>
             </div>
           </td>
@@ -2583,7 +2583,7 @@ function refreshCatalogsUI() {
         <td class="text-right">
           <div class="catalog-actions">
             ${canPartsEdit ? `<button class="btn btn-secondary btn-sm" type="button" data-action="startEditPart" data-sku="${escapeHtml(p.sku)}">Edytuj</button>` : ``}
-            ${canPartsEdit ? `<button class="btn btn-secondary btn-sm" type="button" data-action="togglePartArchive" data-sku="${escapeHtml(p.sku)}">${isArchived ? 'Przywróć' : 'Archiwizuj'}</button>` : ``}
+            ${canPartsEdit ? `<button class="btn ${isArchived ? 'btn-secondary' : 'btn-caution'} btn-sm" type="button" data-action="togglePartArchive" data-sku="${escapeHtml(p.sku)}">${isArchived ? 'Przywróć' : 'Archiwizuj'}</button>` : ``}
             <button class="btn btn-secondary btn-sm" type="button" data-action="openCatalogPartDetails" data-sku="${escapeHtml(p.sku)}">Szczegóły</button>
           </div>
         </td>
@@ -2618,7 +2618,7 @@ function refreshCatalogsUI() {
           <td class="text-right">
             <div class="catalog-actions">
               ${canMachinesEdit ? `<button class="btn btn-secondary btn-sm" type="button" data-action="openMachineEditor" data-machine-code="${escapeHtml(m.code)}">Edytuj</button>` : ``}
-              ${canMachinesEdit ? `<button class="btn btn-secondary btn-sm" type="button" data-action="toggleMachineArchive" data-machine-code="${escapeHtml(m.code)}">${isArchived ? 'Przywróć' : 'Archiwizuj'}</button>` : ``}
+              ${canMachinesEdit ? `<button class="btn ${isArchived ? 'btn-secondary' : 'btn-caution'} btn-sm" type="button" data-action="toggleMachineArchive" data-machine-code="${escapeHtml(m.code)}">${isArchived ? 'Przywróć' : 'Archiwizuj'}</button>` : ``}
               <button class="btn btn-secondary btn-sm" type="button" data-action="openMachineCatalogDetails" data-machine-code="${escapeHtml(m.code)}">Szczegóły</button>
             </div>
           </td>

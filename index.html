@@ -39,7 +39,7 @@
       <section class="tabPanel widePanel" data-tab-panel="parts">
         <div class="card main-section-card-height">
           <div class="cardHeader">
-            <h2>Magazyn Części</h2>
+            <h2>Magazyn części</h2>
             <div class="toolbar warehouse-header-actions" style="margin:0">
               <div class="segmented warehouse-view-switch warehouse-view-switch-parts" role="tablist" aria-label="Tryb widoku magazynu części">
                 <button type="button" id="showAllPartsToggle" role="tab" aria-selected="true">Wszystkie</button>
@@ -83,13 +83,13 @@
             </div>
           </div>
           <div class="toolbar">
-            <input type="text" id="searchParts" placeholder="Szukaj po Nazwie/Typie..." autocomplete="off" />
+            <input type="text" id="searchParts" placeholder="Szukaj po nazwie lub kodzie..." autocomplete="off" />
           </div>
           <div class="warehouse-edit-banner hidden" id="stockEditBanner" aria-live="polite"></div>
           <div class="table-container">
             <table class="table-sticky" id="skuSummaryTable">
               <thead>
-                <tr><th>Nazwa (ID)</th><th>Typ</th><th class="text-right">Stan</th><th class="text-right">Wartość</th><th>Status</th><th class="text-right">Akcje</th></tr>
+                <tr><th>Kod</th><th>Nazwa części</th><th class="text-right">Stan</th><th class="text-right">Wartość</th><th>Status</th><th class="text-right">Akcje</th></tr>
               </thead>
               <tbody></tbody>
             </table>
@@ -99,7 +99,7 @@
 
       <section class="tabPanel hidden operation-tab operation-tab-delivery" data-tab-panel="delivery">
         <div class="card operation-card main-section-card-height">
-          <div class="cardHeader operation-card-header"><div><h2>Przyjęcie Dostawy</h2></div></div>
+          <div class="cardHeader operation-card-header"><div><h2>Przyjęcie dostawy</h2></div></div>
           <div class="operation-shell">
             <div class="operation-grid">
               <div class="operation-main">
@@ -121,7 +121,7 @@
                 <div class="operation-side-body operation-side-body-delivery">
                   <div class="table-container operation-table-wrap operation-side-scroll">
                     <table id="deliveryItemsTable">
-                      <thead><tr><th>Nazwa (ID)</th><th class="text-right">Ilość</th><th class="text-right">Cena</th><th class="text-right">Razem</th><th></th></tr></thead>
+                      <thead><tr><th>Część</th><th class="text-right">Ilość</th><th class="text-right">Cena</th><th class="text-right">Razem</th><th></th></tr></thead>
                       <tbody></tbody>
                     </table>
                   </div>
@@ -141,7 +141,7 @@
 
       <section class="tabPanel hidden operation-tab operation-tab-build" data-tab-panel="build">
         <div class="card operation-card main-section-card-height">
-          <div class="cardHeader operation-card-header"><div><h2>Zlecenie Produkcyjne</h2></div></div>
+          <div class="cardHeader operation-card-header"><div><h2>Zlecenie produkcyjne</h2></div></div>
           <div class="operation-shell">
             <div class="operation-grid operation-grid-build">
               <div class="operation-main">
@@ -163,13 +163,13 @@
                     <table id="buildItemsTable"><thead><tr><th>Maszyna</th><th class="text-right">Ilość</th><th></th></tr></thead><tbody></tbody></table>
                   </div>
                   <div class="editor-panel hidden operation-manual-box operation-side-scroll" id="manualConsumeBox">
-                    <div class="editor-header operation-manual-header" style="margin-bottom:var(--space-3);padding-bottom:var(--space-2)"><h4 style="margin:0;font-size:var(--text-base)">Wybór partii (Manual)</h4></div>
+                    <div class="editor-header operation-manual-header" style="margin-bottom:var(--space-3);padding-bottom:var(--space-2)"><h4 style="margin:0;font-size:var(--text-base)">Ręczny wybór partii</h4></div>
                     <div class="consume-grid" id="manualConsumeUI"></div>
                   </div>
                 </div>
                 <div class="delivery-actions operation-summary-panel">
                   <div class="delivery-summary operation-summary-grid"><span class="text-secondary">Maszyn:</span><strong id="buildItemsCount">0</strong></div>
-                  <button type="button" class="btn btn-primary operation-cta" id="finalizeBuildBtn" disabled>Finalizuj</button>
+                  <button type="button" class="btn btn-primary operation-cta" id="finalizeBuildBtn" disabled>Zatwierdź</button>
                 </div>
               </div>
             </div>
@@ -180,7 +180,7 @@
       <section class="tabPanel hidden" data-tab-panel="machines">
         <div class="card main-section-card-height">
           <div class="cardHeader warehouse-machines-header">
-            <div><h2>Magazyn Wyrobów Gotowych</h2></div>
+            <div><h2>Wyroby gotowe</h2></div>
             <div class="segmented warehouse-view-switch warehouse-view-switch-machines" role="tablist" aria-label="Tryb widoku magazynu maszyn">
               <button type="button" id="showAllMachinesToggle" role="tab" aria-selected="true">Wszystkie</button>
               <button type="button" id="showArchivedMachinesToggle" role="tab" aria-selected="false">Pokaż zarchiwizowane</button>
@@ -188,17 +188,17 @@
           </div>
           <div class="toolbar"><input type="text" id="searchMachines" placeholder="Szukaj..." autocomplete="off" /></div>
           <div class="table-container">
-            <table id="machinesStockTable"><thead><tr><th>Nazwa Maszyny (ID)</th><th>Typ</th><th class="text-right">Stan</th><th>Status</th></tr></thead><tbody></tbody></table>
+            <table id="machinesStockTable"><thead><tr><th>Kod</th><th>Nazwa maszyny</th><th class="text-right">Stan</th><th>Status</th></tr></thead><tbody></tbody></table>
           </div>
         </div>
       </section>
 
       <section class="tabPanel hidden" data-tab-panel="catalog_parts">
         <div class="card main-section-card-height">
-          <div class="cardHeader"><div><h2>Baza Części</h2></div><button type="button" class="btn btn-primary btn-sm" id="toggleNewPartBtn">Nowa</button></div>
-          <div class="toolbar"><input type="text" id="searchCatalogParts" placeholder="Szukaj po Nazwie/Typie..." autocomplete="off" /></div>
+          <div class="cardHeader"><div><h2>Katalog części</h2></div><button type="button" class="btn btn-primary btn-sm" id="toggleNewPartBtn">Nowa</button></div>
+          <div class="toolbar"><input type="text" id="searchCatalogParts" placeholder="Szukaj po nazwie lub kodzie..." autocomplete="off" /></div>
           <div class="table-container">
-            <table id="partsCatalogTable"><thead><tr><th>Nazwa (ID)</th><th>Typ</th><th>Dostawcy</th><th>Status</th><th class="text-right">Akcje</th></tr></thead><tbody></tbody></table>
+            <table id="partsCatalogTable"><thead><tr><th>Kod</th><th>Nazwa części</th><th>Dostawcy</th><th>Status</th><th class="text-right">Akcje</th></tr></thead><tbody></tbody></table>
           </div>
         </div>
       </section>
@@ -207,7 +207,7 @@
         <div class="card main-section-card-height">
           <div class="cardHeader supplier-catalog-header">
             <div>
-              <h2>Dostawcy i Cenniki</h2>
+              <h2>Dostawcy i cenniki</h2>
             </div>
             <div class="inline-action-popover-anchor supplier-add-popover-anchor" id="supplierAddPopoverAnchor">
               <button type="button" class="btn btn-primary btn-sm supplier-add-trigger" id="toggleSupplierPopoverBtn" aria-expanded="false" aria-controls="supplierAddPopoverPanel">Nowy dostawca</button>
@@ -232,10 +232,10 @@
 
       <section class="tabPanel hidden" data-tab-panel="catalog_machines">
         <div class="card main-section-card-height">
-          <div class="cardHeader"><div><h2>Baza Maszyn (BOM)</h2></div><button type="button" class="btn btn-primary btn-sm" id="openMachineModalBtn">Nowa</button></div>
-          <div class="toolbar"><input type="text" id="searchCatalogMachines" placeholder="Szukaj po Nazwie/Typie..." autocomplete="off" /></div>
+          <div class="cardHeader"><div><h2>Katalog maszyn</h2></div><button type="button" class="btn btn-primary btn-sm" id="openMachineModalBtn">Nowa</button></div>
+          <div class="toolbar"><input type="text" id="searchCatalogMachines" placeholder="Szukaj po nazwie lub kodzie..." autocomplete="off" /></div>
           <div class="table-container">
-            <table id="machinesCatalogTable"><thead><tr><th>Nazwa (ID)</th><th>Typ</th><th class="text-right">Części</th><th>Status</th><th class="text-right">Akcje</th></tr></thead><tbody id="machinesCatalogBody"></tbody></table>
+            <table id="machinesCatalogTable"><thead><tr><th>Kod</th><th>Nazwa maszyny</th><th class="text-right">Części</th><th>Status</th><th class="text-right">Akcje</th></tr></thead><tbody id="machinesCatalogBody"></tbody></table>
           </div>
         </div>
       </section>
@@ -286,13 +286,13 @@
               </div>
 
               <div class="segmented role-permissions-role-switch" id="rolePermissionsRoleSwitch" role="tablist" aria-label="Edytowana rola">
-                <button type="button" class="active" data-role-permissions-role="owner" role="tab" aria-selected="true">owner</button>
-                <button type="button" data-role-permissions-role="admin" role="tab" aria-selected="false">admin</button>
-                <button type="button" data-role-permissions-role="worker" role="tab" aria-selected="false">worker</button>
+                <button type="button" class="active" data-role-permissions-role="owner" role="tab" aria-selected="true">Właściciel</button>
+                <button type="button" data-role-permissions-role="admin" role="tab" aria-selected="false">Administrator</button>
+                <button type="button" data-role-permissions-role="worker" role="tab" aria-selected="false">Pracownik</button>
               </div>
 
               <div class="users-admin-readonly-note hidden" id="rolePermissionsReadOnlyNote">
-                Tylko owner może zmieniać konfigurację ról i tworzyć użytkowników. Ty możesz tu co najwyżej popatrzeć, co też jest jakąś formą aktywności.
+                Tylko właściciel może zmieniać konfigurację ról i tworzyć użytkowników. Pozostali użytkownicy mają dostęp wyłącznie do podglądu.
               </div>
 
               <div class="role-permissions-editor" id="rolePermissionsEditor"></div>
@@ -325,8 +325,8 @@
                   <div class="form-row" style="margin-bottom:0">
                     <label>Rola
                       <select id="createWorkerRoleSelect">
-                        <option value="worker" selected>worker</option>
-                        <option value="admin">admin</option>
+                        <option value="worker" selected>Pracownik</option>
+                        <option value="admin">Administrator</option>
                       </select>
                     </label>
                   </div>
@@ -361,8 +361,8 @@
                   <div class="user-info-form-grid">
                     <label>Rola
                       <select id="userInfoRoleSelect">
-                        <option value="worker">worker</option>
-                        <option value="admin">admin</option>
+                        <option value="worker">Pracownik</option>
+                        <option value="admin">Administrator</option>
                       </select>
                     </label>
                     <label>Status aktywności
@@ -386,7 +386,7 @@
         <div class="card main-section-card-height">
           <div class="cardHeader history-card-header">
             <div>
-              <h2>Ostatnie akcje</h2>
+              <h2>Historia operacji</h2>
             </div>
             <div class="segmented history-view-switch" role="tablist" aria-label="Widok historii">
               <button type="button" id="historyViewAllBtn" role="tab" aria-selected="false">Wszystkie</button>
@@ -431,13 +431,13 @@
               <button type="button" class="tab-btn tab-btn-priority" data-tab-target="delivery"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Dostawa</button>
               <button type="button" class="tab-btn tab-btn-priority" data-tab-target="build"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>Produkcja</button>
             </div>
-            <button type="button" class="tab-btn active" data-tab-target="parts"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>Magazyn Części</button>
-            <button type="button" class="tab-btn" data-tab-target="machines"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>Magazyn Maszyn</button>
+            <button type="button" class="tab-btn active" data-tab-target="parts"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>Magazyn części</button>
+            <button type="button" class="tab-btn" data-tab-target="machines"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>Wyroby gotowe</button>
             <button type="button" class="tab-btn" data-tab-target="users"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Użytkownicy</button>
-            <button type="button" class="tab-btn" data-tab-target="history"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Ostatnie akcje</button>
+            <button type="button" class="tab-btn" data-tab-target="history"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Historia operacji</button>
             <button type="button" class="tab-btn" data-tab-target="catalog_suppliers"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Dostawcy</button>
-            <button type="button" class="tab-btn" data-tab-target="catalog_parts"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Baza Części</button>
-            <button type="button" class="tab-btn" data-tab-target="catalog_machines"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/></svg>Baza maszyn</button>
+            <button type="button" class="tab-btn" data-tab-target="catalog_parts"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Katalog części</button>
+            <button type="button" class="tab-btn" data-tab-target="catalog_machines"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/></svg>Katalog maszyn</button>
           </nav>
         </div>
         <div class="side-section side-section-warehouse">
@@ -545,8 +545,8 @@
         <div class="part-editor-grid">
           <div class="part-editor-form">
             <div class="form-row form-row-2" style="margin-bottom:0">
-              <label>Nazwa (ID)<input type="text" id="partSkuInput" placeholder="np. SR-M6-30" autocomplete="off" /></label>
-              <label>Typ<input type="text" id="partNameInput" placeholder="np. Śruba M6x30" autocomplete="off" /></label>
+              <label>Kod części<input type="text" id="partSkuInput" placeholder="np. SR-M6-30" autocomplete="off" /></label>
+              <label>Nazwa części<input type="text" id="partNameInput" placeholder="np. Śruba M6x30" autocomplete="off" /></label>
             </div>
             <div class="form-row form-row-2 part-threshold-row" style="margin-bottom:0">
               <label>Próg żółty<input type="number" id="partYellowThresholdInput" min="0" step="1" inputmode="numeric" placeholder="domyślny" autocomplete="off" /></label>
@@ -597,7 +597,7 @@
           </div>
           <div class="supplier-editor-prices">
             <div class="table-container">
-              <table><thead><tr><th>Nazwa (ID)</th><th>Typ</th><th class="text-right">Cena PLN</th></tr></thead><tbody id="supplierEditorPriceBody"></tbody></table>
+              <table><thead><tr><th>Kod części</th><th>Nazwa części</th><th class="text-right">Cena PLN</th></tr></thead><tbody id="supplierEditorPriceBody"></tbody></table>
             </div>
           </div>
         </div>
@@ -614,25 +614,25 @@
       <button type="button" class="machine-editor-close" id="machineEditorCloseBtn" aria-label="Zamknij">×</button>
       <div class="editor-panel machine-editor-panel hidden" id="machineEditorTemplate">
         <div class="editor-header machine-editor-header">
-          <div><h4 class="editor-title" id="machineEditorTitle">Nowa maszyna</h4><span class="editor-hint" id="machineEditorHint">Zbuduj BOM.</span></div>
+          <div><h4 class="editor-title" id="machineEditorTitle">Nowa maszyna</h4><span class="editor-hint" id="machineEditorHint">Zdefiniuj dane i skład materiałowy.</span></div>
           <div class="machine-editor-title-meta"><span id="machineEditorName" class="accent">—</span><span class="badge" id="machineEditorCode">NOWA</span></div>
         </div>
         <div class="machine-editor-grid">
           <div class="machine-editor-meta">
             <div class="form-row form-row-2 machine-editor-form-row">
-              <label>Nazwa (ID)<input type="text" id="machineCodeInput" placeholder="np. M-100" autocomplete="off" /></label>
-              <label>Typ<input type="text" id="machineNameInput" placeholder="np. Wiertarka" autocomplete="off" /></label>
+              <label>Kod maszyny<input type="text" id="machineCodeInput" placeholder="np. M-100" autocomplete="off" /></label>
+              <label>Nazwa maszyny<input type="text" id="machineNameInput" placeholder="np. Wiertarka" autocomplete="off" /></label>
             </div>
           </div>
           <div class="machine-editor-bom">
-            <div class="editor-header machine-editor-subheader"><div><h5 class="editor-title">Skład</h5><span class="editor-hint">Dodaj części.</span></div></div>
+            <div class="editor-header machine-editor-subheader"><div><h5 class="editor-title">Skład materiałowy</h5><span class="editor-hint">Dodaj części potrzebne do produkcji jednej sztuki.</span></div></div>
             <div class="form-row machine-editor-bom-row">
               <label>Dodaj część<select id="bomSkuSelect"></select></label>
               <label style="max-width:120px">Ilość<input type="number" id="bomQtyInput" min="1" step="1" value="1" /></label>
               <button type="button" class="btn btn-secondary" id="addBomItemBtn">Dodaj</button>
             </div>
             <div class="table-container">
-              <table id="bomTable"><thead><tr><th>Część</th><th>Typ</th><th class="text-right">Ilość</th><th></th></tr></thead><tbody></tbody></table>
+              <table id="bomTable"><thead><tr><th>Kod części</th><th>Nazwa części</th><th class="text-right">Ilość</th><th></th></tr></thead><tbody></tbody></table>
             </div>
           </div>
         </div>

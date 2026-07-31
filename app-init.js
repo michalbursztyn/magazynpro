@@ -978,14 +978,14 @@ function ensureMainTableScrollContainers() {
 // === MAIN INIT ===
 
 const APP_TABS = Object.freeze([
-  { id: "parts", label: "Magazyn Części", description: "" },
+  { id: "parts", label: "Magazyn części", description: "" },
   { id: "delivery", label: "Dostawa", description: "" },
   { id: "build", label: "Produkcja", description: "" },
-  { id: "machines", label: "Magazyn Maszyn", description: "" },
-  { id: "catalog_parts", label: "Baza Części", description: "" },
+  { id: "machines", label: "Wyroby gotowe", description: "" },
+  { id: "catalog_parts", label: "Katalog części", description: "" },
   { id: "catalog_suppliers", label: "Dostawcy", description: "" },
-  { id: "catalog_machines", label: "Baza Maszyn", description: "" },
-  { id: "history", label: "Ostatnie akcje", description: "" },
+  { id: "catalog_machines", label: "Katalog maszyn", description: "" },
+  { id: "history", label: "Historia operacji", description: "" },
   { id: "users", label: "Użytkownicy", description: "" }
 ]);
 
@@ -1053,8 +1053,8 @@ const APP_FEATURE_PERMISSIONS = Object.freeze([
   {
     key: 'machines_edit',
     tabId: 'catalog_machines',
-    label: 'Edycja, BOM i archiwizacja',
-    description: 'Edycja maszyn, BOM oraz archiwizacja i przywracanie.'
+    label: 'Edycja składu i archiwizacja',
+    description: 'Edycja maszyn, ich składu materiałowego oraz archiwizacja i przywracanie.'
   }
 ]);
 
@@ -1093,6 +1093,17 @@ window.companyRolePermissionsState = window.companyRolePermissionsState || {
 
 function getCurrentCompanyRole() {
   return String(window.appAuth?.companyRole || "").trim().toLowerCase();
+}
+
+const COMPANY_ROLE_LABELS = Object.freeze({
+  owner: 'Właściciel',
+  admin: 'Administrator',
+  worker: 'Pracownik'
+});
+
+function getCompanyRoleLabel(role) {
+  const normalizedRole = String(role || '').trim().toLowerCase();
+  return COMPANY_ROLE_LABELS[normalizedRole] || normalizedRole || '—';
 }
 
 function isCurrentCompanyOwner() {
@@ -1519,7 +1530,7 @@ async function saveRolePermissions(role) {
     return;
   }
   if (!['admin', 'worker'].includes(normalizedRole)) {
-    toast('Brak zmian', 'Owner ma zawsze pełny dostęp i nie jest ograniczany konfiguracją.', 'warning');
+    toast('Brak zmian', 'Właściciel ma zawsze pełny dostęp i nie jest ograniczany konfiguracją.', 'warning');
     return;
   }
 
@@ -1551,7 +1562,7 @@ async function saveRolePermissions(role) {
     }
     window.appAuth.rolePermissions = st.items;
     refreshRoleAccessUI();
-    toast('Uprawnienia zapisane', `Konfiguracja roli ${normalizedRole} została zaktualizowana.`, 'success');
+    toast('Uprawnienia zapisane', `Konfiguracja roli „${getCompanyRoleLabel(normalizedRole)}” została zaktualizowana.`, 'success');
   } catch (err) {
     logSafeError('Błąd zapisu konfiguracji ról.', err);
     toast('Nie zapisano konfiguracji', window.getUserFriendlyErrorMessage?.(err, 'Nie udało się zapisać konfiguracji roli.') || 'Nie udało się zapisać konfiguracji roli.', 'error');
@@ -1610,7 +1621,7 @@ function renderRolePermissionsPanel() {
   if (selectedRole === 'owner') {
     root.innerHTML = `
       <div class="role-permissions-owner-note">
-        <h5>Owner ma pełny dostęp zawsze</h5>
+        <h5>Właściciel ma zawsze pełny dostęp</h5>
         <div class="role-permissions-summary role-permissions-summary-compact">
           <span class="text-secondary">Dostęp do zakładek</span>
           <strong>${totalCount} / ${totalCount}</strong>
@@ -1620,7 +1631,7 @@ function renderRolePermissionsPanel() {
     return;
   }
 
-  const roleLabel = selectedRole === 'admin' ? 'Administrator' : 'Pracownik';
+  const roleLabel = getCompanyRoleLabel(selectedRole);
   const hasDraft = !!st.drafts?.[selectedRole];
   const enabledFeatureCount = configurableFeatures.filter(feature => isRoleFeatureEffectivelyEnabled(selectedRole, feature.key)).length;
   const totalFeatureCount = configurableFeatures.length;
@@ -1862,6 +1873,7 @@ function getCompanyUserByMemberId(memberId) {
 function getCompanyUserAdminMeta(item) {
   const currentUserId = window.appAuth?.user?.id || null;
   const rowRole = String(item?.role || '').trim().toLowerCase();
+  const rowRoleLabel = getCompanyRoleLabel(rowRole);
   const isOwnerRow = rowRole === 'owner';
   const isSelf = !!currentUserId && item?.user_id === currentUserId;
   const hasUsersManagePermission = canManageUsers();
@@ -1877,13 +1889,14 @@ function getCompanyUserAdminMeta(item) {
   if (!hasUsersManagePermission) {
     readonlyMessage = 'Nie masz uprawnienia do zarządzania użytkownikami. Możesz tylko podejrzeć dane.';
   } else if (isOwnerRow) {
-    readonlyMessage = 'Owner nie może być edytowany z tego poziomu. I bardzo dobrze.';
+    readonlyMessage = 'Rola właściciela nie może być edytowana z tego poziomu.';
   } else if (isSelf) {
     readonlyMessage = 'Nie możesz zmieniać własnej roli ani aktywności z tego poziomu.';
   }
 
   return {
     rowRole,
+    rowRoleLabel,
     isOwnerRow,
     isSelf,
     canModify,
@@ -1918,7 +1931,7 @@ function openCompanyUserInfoModal(memberId) {
 
   if (titleEl) titleEl.textContent = meta.fullName;
   if (subtitleEl) subtitleEl.textContent = meta.email;
-  if (roleHintEl) roleHintEl.textContent = `Rola: ${meta.rowRole}`;
+  if (roleHintEl) roleHintEl.textContent = `Rola: ${meta.rowRoleLabel}`;
 
   summaryEl.innerHTML = `
     <div class="user-info-card">
@@ -1931,7 +1944,7 @@ function openCompanyUserInfoModal(memberId) {
     </div>
     <div class="user-info-card">
       <span class="user-info-card-label">Rola</span>
-      <strong class="user-info-card-value">${escapeHtml(meta.rowRole)}</strong>
+      <strong class="user-info-card-value">${escapeHtml(meta.rowRoleLabel)}</strong>
     </div>
     <div class="user-info-card">
       <span class="user-info-card-label">Status aktywności</span>
@@ -1946,6 +1959,8 @@ function openCompanyUserInfoModal(memberId) {
   }
   statusInput.value = meta.statusLabel;
   toggleActiveBtn.textContent = meta.actionLabel;
+  toggleActiveBtn.classList.remove('btn-secondary', 'btn-primary', 'btn-success', 'btn-danger');
+  toggleActiveBtn.classList.add(meta.nextActive ? 'btn-success' : 'btn-danger');
   toggleActiveBtn.dataset.memberId = String(item.id);
   toggleActiveBtn.dataset.nextActive = meta.nextActive ? '1' : '0';
   toggleActiveBtn.disabled = !meta.canModify;
@@ -2032,7 +2047,7 @@ function renderUsersAdmin() {
             <strong>${escapeHtml(meta.fullName)}</strong>
           </div>
         </td>
-        <td><span class="user-role-chip">${escapeHtml(meta.rowRole)}</span></td>
+        <td><span class="user-role-chip">${escapeHtml(meta.rowRoleLabel)}</span></td>
         <td class="text-right user-actions-cell">
           ${hasUsersManagePermission ? `
             <div class="user-row-actions-clean">
@@ -2145,7 +2160,7 @@ function bindUserManagementUI() {
     }
 
     if (!['worker', 'admin'].includes(role)) {
-      toast('Nieprawidłowa rola', 'Na tym etapie możesz tworzyć tylko role worker albo admin.', 'warning');
+      toast('Nieprawidłowa rola', 'Możesz utworzyć użytkownika wyłącznie z rolą pracownika albo administratora.', 'warning');
       return;
     }
 
@@ -2172,7 +2187,7 @@ function bindUserManagementUI() {
 
       toast(
         'Użytkownik utworzony',
-        `Konto ${email} z rolą ${role} zostało utworzone.`,
+        `Konto ${email} z rolą „${getCompanyRoleLabel(role)}” zostało utworzone.`,
         'success'
       );
     } catch (err) {
@@ -2274,7 +2289,7 @@ function bindUserManagementUI() {
       const select = document.getElementById('userInfoRoleSelect');
       const nextRole = String(select?.value || 'worker').trim().toLowerCase();
       if (!['worker', 'admin'].includes(nextRole)) {
-        toast('Nieprawidłowa rola', 'Można ustawić tylko rolę worker albo admin.', 'warning');
+        toast('Nieprawidłowa rola', 'Można ustawić wyłącznie rolę pracownika albo administratora.', 'warning');
         return;
       }
       try {
@@ -2460,7 +2475,7 @@ function updateAuthUI() {
   if (panelCompanyName) panelCompanyName.textContent = companyName;
   if (accountEmailDisplay) accountEmailDisplay.textContent = email;
   if (accountCompanyDisplay) accountCompanyDisplay.textContent = companyName;
-  if (accountRoleDisplay) accountRoleDisplay.textContent = String(role).toUpperCase();
+  if (accountRoleDisplay) accountRoleDisplay.textContent = getCompanyRoleLabel(role).toUpperCase();
   setAuthError("");
   setAccountPasswordError("");
   if (accessReady) applyRoleAccess();
@@ -3338,7 +3353,7 @@ document.getElementById("addPartBtn")?.addEventListener("click", async () => {
   const normalizedSku = normalize(sku);
   const skuInput = document.getElementById("partSkuInput");
   if (normalizedSku && state.partsCatalog.has(skuKey(normalizedSku))) {
-    toast("ID zajęte", `Część o ID "${normalizedSku}" już istnieje w bazie.`, "warning");
+    toast("Kod zajęty", `Część o kodzie "${normalizedSku}" już istnieje w katalogu.`, "warning");
     skuInput?.focus();
     return;
   }
@@ -3352,17 +3367,17 @@ document.getElementById("addPartBtn")?.addEventListener("click", async () => {
   }
 
   if (!/^[a-zA-Z0-9_-]+$/.test(normalizedSku)) {
-    toast("Błąd walidacji", "ID może zawierać tylko litery, cyfry, myślniki i podkreślenia (bez spacji).", "warning");
+    toast("Błąd walidacji", "Kod części może zawierać tylko litery, cyfry, myślniki i podkreślenia (bez spacji).", "warning");
     skuInput?.focus?.();
     return;
   }
   if (normalizedSku.length > 50) {
-    toast("Błąd walidacji", "ID nie może być dłuższe niż 50 znaków.", "warning");
+    toast("Błąd walidacji", "Kod części nie może być dłuższy niż 50 znaków.", "warning");
     skuInput?.focus?.();
     return;
   }
   if (normalize(name).length > 200) {
-    toast("Błąd walidacji", "Typ nie może być dłuższy niż 200 znaków.", "warning");
+    toast("Błąd walidacji", "Nazwa części nie może być dłuższa niż 200 znaków.", "warning");
     return;
   }
 
@@ -3680,8 +3695,8 @@ function syncMachineEditorHeader() {
   if (titleEl) titleEl.textContent = editingMachineIsNew ? "Nowa definicja maszyny" : "Edycja definicji maszyny";
   if (hintEl) {
     hintEl.textContent = editingMachineIsNew
-      ? "Uzupełnij dane maszyny i od razu zbuduj jej BOM."
-      : "Edytuj dane maszyny i jej skład w jednym miejscu.";
+      ? "Uzupełnij dane maszyny i określ jej skład materiałowy."
+      : "Edytuj dane maszyny i jej skład materiałowy w jednym miejscu.";
   }
   if (nameEl) nameEl.textContent = name || "—";
   if (codeEl) codeEl.textContent = code || (editingMachineIsNew ? "NOWA" : "—");
@@ -3959,7 +3974,7 @@ document.getElementById("supplierEditorCancelBtn")?.addEventListener("click", ()
 
 window.openMachineEditor = (code) => {
   if (!canEditCatalogMachines()) {
-    toast("Brak dostępu", "Nie masz uprawnienia do edycji maszyn i BOM.", "warning");
+    toast("Brak dostępu", "Nie masz uprawnienia do edycji maszyn i ich składu materiałowego.", "warning");
     return;
   }
 
@@ -4020,7 +4035,7 @@ function renderBomTable() {
   }
 
   if (!draft.bom.length) {
-    tbody.innerHTML = `<tr><td colspan="4" class="text-muted" style="text-align:center;padding:var(--space-4)">BOM jest pusty. To dozwolone, ale maszyna otrzyma status BRAK CZĘŚCI.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4" class="text-muted" style="text-align:center;padding:var(--space-4)">Skład materiałowy jest pusty. To dozwolone, ale maszyna otrzyma status BRAK CZĘŚCI.</td></tr>`;
   } else {
     tbody.innerHTML = draft.bom.map((b, idx) => {
       const p = state.partsCatalog.get(skuKey(b.sku));
@@ -4060,7 +4075,7 @@ document.getElementById("machineNameInput")?.addEventListener("input", (e) => {
 document.getElementById("addBomItemBtn")?.addEventListener("click", () => {
   const canModifyDraft = editingMachineIsNew ? canCreateCatalogMachines() : canEditCatalogMachines();
   if (!canModifyDraft) {
-    toast("Brak dostępu", "Nie masz uprawnienia do edycji BOM maszyn.", "warning");
+    toast("Brak dostępu", "Nie masz uprawnienia do edycji składu materiałowego maszyn.", "warning");
     return;
   }
 
@@ -4099,10 +4114,10 @@ document.getElementById("addBomItemBtn")?.addEventListener("click", () => {
   const existing = draft.bom.find(b => skuKey(b.sku) === skuKey(sku));
   if (existing) {
     existing.qty = qty;
-    toast("Zaktualizowano", `Ilość części ${sku} w BOM została zmieniona na ${qty}.`, "success");
+    toast("Zaktualizowano", `Ilość części ${sku} w składzie materiałowym została zmieniona na ${qty}.`, "success");
   } else {
     draft.bom.push({ sku, qty });
-    toast("Dodano do BOM", `Część ${sku} została dodana do składu maszyny.`, "success");
+    toast("Dodano do składu", `Część ${sku} została dodana do składu materiałowego maszyny.`, "success");
   }
 
   resetBomEditorInputs();
@@ -4113,7 +4128,7 @@ document.getElementById("addBomItemBtn")?.addEventListener("click", () => {
 window.removeBomItem = (idx) => {
   const canModifyDraft = editingMachineIsNew ? canCreateCatalogMachines() : canEditCatalogMachines();
   if (!canModifyDraft) {
-    toast("Brak dostępu", "Nie masz uprawnienia do edycji BOM maszyn.", "warning");
+    toast("Brak dostępu", "Nie masz uprawnienia do edycji składu materiałowego maszyn.", "warning");
     return;
   }
 
@@ -4128,7 +4143,7 @@ document.getElementById("machineEditorSaveBtn")?.addEventListener("click", async
   const isCreateFlow = !!editingMachineIsNew;
   const hasPermission = isCreateFlow ? canCreateCatalogMachines() : canEditCatalogMachines();
   if (!hasPermission) {
-    toast("Brak dostępu", isCreateFlow ? "Nie masz uprawnienia do dodawania maszyn." : "Nie masz uprawnienia do edycji maszyn i BOM.", "warning");
+    toast("Brak dostępu", isCreateFlow ? "Nie masz uprawnienia do dodawania maszyn." : "Nie masz uprawnienia do edycji maszyn i ich składu materiałowego.", "warning");
     return;
   }
 
@@ -4194,7 +4209,7 @@ document.getElementById("machineEditorSaveBtn")?.addEventListener("click", async
 
     const successMsg = editingMachineIsNew
       ? `"${name}" została dodana do katalogu.`
-      : `BOM maszyny "${name}" został zaktualizowany.`;
+      : `Skład materiałowy maszyny "${name}" został zaktualizowany.`;
 
     unsavedChanges.clear("machineEditor");
     closeMachineEditorModal();
@@ -4224,7 +4239,7 @@ document.getElementById("machineEditorSaveBtn")?.addEventListener("click", async
 
 document.getElementById("machineEditorCancelBtn")?.addEventListener("click", () => {
   if (unsavedChanges.machineEditor) {
-    if (!confirm("Masz niezapisane zmiany w BOM. Po anulowaniu utracisz je bez zapisu. Czy chcesz kontynuować?")) {
+    if (!confirm("Masz niezapisane zmiany w składzie materiałowym. Po anulowaniu utracisz je bez zapisu. Czy chcesz kontynuować?")) {
       return;
     }
   }
@@ -4469,7 +4484,7 @@ async function saveEditPart() {
   const thresholds = readPartThresholdForm();
 
   if (!sku || !name) {
-    toast("Brak danych", "Podaj nazwę (ID) i typ części.", "warning");
+    toast("Brak danych", "Podaj kod i nazwę części.", "warning");
     return;
   }
 
@@ -4483,7 +4498,7 @@ async function saveEditPart() {
   const skuChanged = k !== originalK;
 
   if (skuChanged && state.partsCatalog.has(k)) {
-    toast("ID zajęte", `Część o ID "${sku}" już istnieje w bazie.`, "warning");
+    toast("Kod zajęty", `Część o kodzie "${sku}" już istnieje w katalogu.`, "warning");
     skuInput?.focus();
     return;
   }

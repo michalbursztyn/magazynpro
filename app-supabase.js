@@ -418,7 +418,7 @@ window.upsertCompanyRolePermissions = async function upsertCompanyRolePermission
   const companyId = requireBusinessCompanyId(companyIdOverride);
   const normalizedRole = String(role || "").trim().toLowerCase();
   if (!["admin", "worker"].includes(normalizedRole)) {
-    throw new Error("Na tym etapie można zapisywać konfigurację tylko dla ról admin i worker.");
+    throw new Error("Konfigurację można zapisywać wyłącznie dla ról administratora i pracownika.");
   }
 
   const payload = {
@@ -500,7 +500,7 @@ window.updateCompanyMember = async function updateCompanyMember(memberId, update
     : null;
 
   if (normalizedRole !== null && !["admin", "worker"].includes(normalizedRole)) {
-    throw new Error("Można ustawić wyłącznie rolę admin albo worker.");
+    throw new Error("Można ustawić wyłącznie rolę administratora albo pracownika.");
   }
   if (normalizedRole === null && nextActive === null) {
     throw new Error("Brak zmian do zapisania.");
@@ -535,7 +535,7 @@ window.createCompanyUser = async function createCompanyUser(payload = {}) {
   if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Podaj poprawny adres e-mail pracownika.");
   if (!password) throw new Error("Podaj hasło startowe.");
   if (password.length < 6) throw new Error("Hasło startowe musi mieć co najmniej 6 znaków.");
-  if (!["worker", "admin"].includes(role)) throw new Error("Na tym etapie można tworzyć tylko konta worker albo admin.");
+  if (!["worker", "admin"].includes(role)) throw new Error("Można tworzyć wyłącznie konta pracowników albo administratorów.");
 
   const functionName = String(
     window.APP_SUPABASE_CONFIG?.createUserFunctionName
@@ -592,7 +592,7 @@ window.createCompanyUser = async function createCompanyUser(payload = {}) {
       invalid_full_name: 'Podaj poprawne imię i nazwisko.',
       invalid_email: 'Podaj poprawny adres e-mail.',
       invalid_password: 'Hasło musi mieć od 6 do 128 znaków.',
-      invalid_role: 'Wybierz rolę admin albo worker.',
+      invalid_role: 'Wybierz rolę administratora albo pracownika.',
       payload_too_large: 'Przesłane dane są zbyt duże.',
       missing_env: 'Funkcja tworzenia użytkowników nie jest poprawnie skonfigurowana.',
       authorization_check_failed: 'Nie udało się potwierdzić uprawnień użytkownika.',
@@ -911,7 +911,7 @@ window.fetchCatalogStateFromSupabase = async function fetchCatalogStateFromSupab
     if (!machineId || !part || !bomByMachineId.has(machineId)) return;
     bomByMachineId.get(machineId).push({
       sku: String(part.sku || '').trim(),
-      qty: requirePositiveInt(row?.qty, 'Ilość części w BOM')
+      qty: requirePositiveInt(row?.qty, 'Ilość części w składzie materiałowym')
     });
   });
 
@@ -1119,14 +1119,14 @@ window.saveMachineDefinitionToSupabase = async function saveMachineDefinitionToS
   const pBom = bom.map(item => {
     const partId = getPartIdBySkuFromCatalogRows(partsRows, item?.sku);
     if (seenPartIds.has(partId)) {
-      const error = new Error('Ta sama część nie może występować w BOM więcej niż raz.');
+      const error = new Error('Ta sama część nie może występować w składzie materiałowym więcej niż raz.');
       error.userSafe = true;
       throw error;
     }
     seenPartIds.add(partId);
     return {
       part_id: partId,
-      qty: requirePositiveInt(item?.qty, `Ilość części ${item?.sku || '—'} w BOM`)
+      qty: requirePositiveInt(item?.qty, `Ilość części ${item?.sku || '—'} w składzie materiałowym`)
     };
   });
 

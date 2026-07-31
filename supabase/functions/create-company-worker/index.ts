@@ -174,7 +174,7 @@ Deno.serve(async (req: Request) => {
         ok: false,
         error: "invalid_role",
         message:
-          "Można utworzyć wyłącznie użytkownika z rolą worker albo admin.",
+          "Można utworzyć wyłącznie użytkownika z rolą pracownika albo administratora.",
       });
     }
     if (requestedCompanyId && !UUID_PATTERN.test(requestedCompanyId)) {
@@ -262,7 +262,7 @@ Deno.serve(async (req: Request) => {
         ok: false,
         error: "forbidden",
         message:
-          "Tylko aktywny owner dokładnie jednej firmy może tworzyć użytkowników.",
+          "Tylko aktywny właściciel dokładnie jednej firmy może tworzyć użytkowników.",
       });
     }
 
@@ -400,10 +400,14 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    const requestedRoleLabel = requestedRole === "admin"
+      ? "administratora"
+      : "pracownika";
+
     return json(200, {
       ok: true,
       message:
-        `Użytkownik z rolą ${requestedRole} został utworzony i przypisany do firmy.`,
+        `Użytkownik z rolą ${requestedRoleLabel} został utworzony i przypisany do firmy.`,
       user: {
         id: newUser.id,
         email,
